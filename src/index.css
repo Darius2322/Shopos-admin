@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-paper text-ink font-sans antialiased; }
+  h1, h2 { @apply font-display; }
+}
+@layer components {
+  .card { @apply bg-paper-raised rounded-card border border-slate-700; }
+  .btn-primary { @apply bg-field-600 text-paper rounded-card px-4 py-2 font-medium text-sm hover:bg-field-700 disabled:opacity-50; }
+  .btn-secondary { @apply bg-paper-raised text-ink border border-slate-700 rounded-card px-4 py-2 font-medium text-sm hover:bg-slate-800 disabled:opacity-50; }
+  .input { @apply w-full rounded-card border border-slate-700 bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-field-500; }
+  .tnum { font-variant-numeric: tabular-nums; }
+}
