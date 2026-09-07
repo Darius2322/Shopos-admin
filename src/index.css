@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-paper: #101614;
+  --color-paper-raised: #171f1c;
+  --color-ink: #e9ede9;
+  --color-field-500: #2f8f60;
+  --color-field-600: #3fae76;
+  --color-field-700: #5cc48d;
+  --color-rust-500: #e0654a;
+  --color-rust-600: #e88671;
+  --color-amber-500: #e0a736;
+  --color-amber-600: #eabf5f;
+  --color-slate-400: #7c8a83;
+  --color-slate-500: #a2ada7;
+  --color-slate-700: #2a332f;
+  --color-slate-800: #1c2320;
+}
+
+/* Toggled on <html> by ThemeToggle / persisted in localStorage. Every color
+   above is consumed through a CSS variable (see tailwind.config.js), so this
+   is the only place a light theme needs to be defined. */
+html.light {
+  --color-paper: #f5f7f5;
+  --color-paper-raised: #ffffff;
+  --color-ink: #16211c;
+  --color-field-500: #2f8f60;
+  --color-field-600: #2f8f60;
+  --color-field-700: #257550;
+  --color-rust-500: #c94f36;
+  --color-rust-600: #b8442c;
+  --color-amber-500: #b3821f;
+  --color-amber-600: #96700f;
+  --color-slate-400: #5b675f;
+  --color-slate-500: #3d473f;
+  --color-slate-700: #d8dfda;
+  --color-slate-800: #e9ede9;
+}
+
+@layer base {
+  html, body, #root { @apply h-full; }
+  body { @apply bg-paper text-ink font-sans antialiased; }
+  h1, h2 { @apply font-display; }
+}
+@layer components {
+  .card { @apply bg-paper-raised rounded-card border border-slate-700; }
+  .btn-primary { @apply bg-field-600 text-paper rounded-card px-4 py-2 font-medium text-sm hover:bg-field-700 disabled:opacity-50; }
+  .btn-secondary { @apply bg-paper-raised text-ink border border-slate-700 rounded-card px-4 py-2 font-medium text-sm hover:bg-slate-800 disabled:opacity-50; }
+  .input { @apply w-full rounded-card border border-slate-700 bg-paper px-3.5 py-2.5 text-sm outline-none focus:border-field-500; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  /* Keeps an anchor-jumped section from tucking in under the sticky
+     header + utility bar — without this, "scrollIntoView" lands the
+     heading exactly at the viewport edge where it's clipped/hard to see. */
+  .section-anchor { scroll-margin-top: 6.5rem; }
+}
