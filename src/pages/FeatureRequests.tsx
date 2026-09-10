@@ -40,6 +40,18 @@ export default function FeatureRequests({ supabase }: { supabase: SupabaseClient
     } finally { setBusy(null); }
   }
 
+  async function remove(id: string) {
+    if (!window.confirm('Delete this request permanently? This cannot be undone.')) return;
+    setBusy(id); setError(null);
+    try {
+      const { error: deleteError } = await supabase.from('feature_requests').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      await load();
+    } catch (err) {
+      setError(describeError(err, 'Could not delete the request'));
+    } finally { setBusy(null); }
+  }
+
   if (loading) return <Skeleton />;
 
   const pending = requests.filter((r) => r.status === 'pending');
@@ -70,6 +82,9 @@ export default function FeatureRequests({ supabase }: { supabase: SupabaseClient
             </button>
             <button onClick={() => setReasonPromptFor({ id: r.id, approve: false })} disabled={busy === r.id} className="btn-secondary text-xs px-2.5 py-1 flex items-center gap-1">
               <X className="w-3.5 h-3.5" /> Reject
+            </button>
+            <button onClick={() => remove(r.id)} disabled={busy === r.id} className="text-xs px-2.5 py-1 flex items-center gap-1 text-rust-600 hover:bg-rust-50 rounded-card ml-auto">
+              <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
           </div>
         </Card>

@@ -12,10 +12,12 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [approvedCode, setApprovedCode] = useState<{ businessName: string; code: string; phone: string | null; email: string } | null>(null);
+  const [approvedCode, setApprovedCode] = useState<{ businessName: string; code: string; phone: string | null; email: string; activationLink: string | null } | null>(null);
   const [reasonPromptFor, setReasonPromptFor] = useState<{ id: string; decision: 'rejected' | 'info_requested' } | null>(null);
   const [reasonText, setReasonText] = useState('');
   const [durationByRequest, setDurationByRequest] = useState<Record<string, number | null>>({});
+  const [skipEmailByRequest, setSkipEmailByRequest] = useState<Record<string, boolean>>({});
+  const [linkCopied, setLinkCopied] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -32,11 +34,19 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
       const res = await fetch(`${supabaseUrl}/functions/v1/approve-owner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ ownerRequestId: request.id, durationMonths: durationByRequest[request.id] ?? 12 })
+        body: JSON.stringify({
+          ownerRequestId: request.id, durationMonths: durationByRequest[request.id] ?? 12,
+          skipInviteEmail: !!skipEmailByRequest[request.id]
+        })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Approval failed');
-      if (body.activationCode) setApprovedCode({ businessName: request.business_name, code: body.activationCode, phone: request.phone, email: request.email });
+      if (body.activationCode) {
+        setApprovedCode({
+          businessName: request.business_name, code: body.activationCode,
+          phone: request.phone, email: request.email, activationLink: body.activationLink ?? null
+        });
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed — is the approve-owner Edge Function deployed?');
@@ -89,6 +99,14 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
                 </span>
               )}
               <DurationSelect value={durationByRequest[r.id] ?? 12} onChange={(months) => setDurationByRequest((d) => ({ ...d, [r.id]: months }))} />
+              <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={!!skipEmailByRequest[r.id]}
+                  onChange={(e) => setSkipEmailByRequest((s) => ({ ...s, [r.id]: e.target.checked }))}
+                />
+                Skip invite email (generate a link instead — avoids the email limit)
+              </label>
               <button onClick={() => approve(r)} disabled={busy === r.id} className="btn-primary text-xs px-2.5 py-1 flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" /> Approve
               </button>
@@ -132,11 +150,31 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
         <Modal onClose={() => setApprovedCode(null)}>
           <h3 className="font-display font-semibold text-lg mb-1">Activation code for {approvedCode.businessName}</h3>
           <p className="text-xs text-slate-400 mb-4">
-            An invite email has also been sent so they can set a password. This code is shown only once here and expires in 15 minutes.
+            {approvedCode.activationLink
+              ? 'No invite email was sent (skipped, per your choice below) — share the secure link below yourself. This code and link are shown only once here and expire in 15 minutes.'
+              : 'An invite email has also been sent so they can set a password. This code is shown only once here and expires in 15 minutes.'}
           </p>
           <div className="text-3xl font-mono font-semibold tracking-widest text-center py-4 bg-paper rounded-card mb-4">
             {approvedCode.code}
           </div>
+          {approvedCode.activationLink && (
+            <div className="mb-4">
+              <div className="text-xs font-medium text-slate-500 mb-1">Secure activation link (single-use, Supabase-signed)</div>
+              <div className="flex gap-2">
+                <input readOnly value={approvedCode.activationLink} className="input text-xs flex-1" onFocus={(e) => e.currentTarget.select()} />
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(approvedCode.activationLink!);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="btn-secondary text-xs px-3"
+                >
+                  {linkCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
           <OtpDeliveryActions supabase={supabase} code={approvedCode.code} businessName={approvedCode.businessName} phone={approvedCode.phone} email={approvedCode.email} />
           <button onClick={() => setApprovedCode(null)} className="btn-primary w-full mt-4">Done</button>
         </Modal>

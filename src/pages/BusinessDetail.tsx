@@ -53,10 +53,14 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   async function applyStatus(status: BusinessStatus, reason: string | null) {
     setBusy(true); setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc('admin_set_business_status', {
-        p_business_id: businessId, p_status: status, p_reason: reason
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-set-business-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ businessId, status, reason })
       });
-      if (rpcError) throw rpcError;
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'Status change failed');
       setReasonPromptFor(null); setReasonText('');
       await load();
     } catch (err) {
