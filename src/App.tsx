@@ -105,7 +105,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', permissions: 'Role Defaults', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
