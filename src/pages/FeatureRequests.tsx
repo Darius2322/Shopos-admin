@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Check, X, Sparkles } from 'lucide-react';
+import { Check, X, Sparkles, Trash2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { FeatureRequest } from '../lib/types';
 import { describeError } from '../lib/errors';

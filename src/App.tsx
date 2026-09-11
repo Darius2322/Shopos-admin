@@ -17,6 +17,7 @@ import FeatureRequests from './pages/FeatureRequests';
 import AuditLogs from './pages/AuditLogs';
 import Support from './pages/Support';
 import PlatformSettingsPage from './pages/PlatformSettings';
+import RoleDefaultsPage from './pages/RoleDefaults';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -167,6 +168,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'audit' && <AuditLogs supabase={supabase} />}
             {tab === 'support' && <Support supabase={supabase} />}
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
+            {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
           </div>
         </main>
       </div>
