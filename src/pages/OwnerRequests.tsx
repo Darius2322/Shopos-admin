@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Check, X, HelpCircle } from 'lucide-react';
+import { Check, X, HelpCircle, Trash2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { DurationSelect } from '../components/DurationSelect';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
@@ -26,6 +26,18 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function remove(id: string) {
+    if (!window.confirm('Delete this request permanently? This cannot be undone.')) return;
+    setBusy(id); setError(null);
+    try {
+      const { error: deleteError } = await supabase.from('owner_requests').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the request');
+    } finally { setBusy(null); }
+  }
 
   async function approve(request: OwnerRequest) {
     setBusy(request.id); setError(null);
@@ -122,6 +134,11 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
               )}
             </div>
           )}
+          <div className="flex justify-end mt-2">
+            <button onClick={() => remove(r.id)} disabled={busy === r.id} className="text-xs px-2.5 py-1 flex items-center gap-1 text-rust-600 hover:bg-rust-50 rounded-card">
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          </div>
         </Card>
       ))}
 
