@@ -47,8 +47,14 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
             <div className="min-w-0">
               <div className="text-sm font-medium">{b.name}</div>
               <div className="text-xs text-slate-400">{b.email ?? 'No email'} · {new Date(b.created_at).toLocaleDateString()}</div>
-              <div className="text-xs text-slate-500 mt-0.5" title={b.last_active_at ? `${new Date(b.last_active_at).toLocaleString()}${b.last_activity_kind ? ' · ' + activityLabel(b.last_activity_kind) : ''}` : 'No activity recorded yet'}>
+              <div className="text-xs text-slate-500 mt-0.5">
                 Last active: <span className="font-medium">{formatLastActive(b.last_active_at)}</span>
+                {b.last_active_at && (
+                  <span className="block text-slate-400">
+                    {new Date(b.last_active_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                    {b.last_activity_kind ? ` · ${activityLabel(b.last_activity_kind)}` : ''}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
