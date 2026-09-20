@@ -1,6 +1,6 @@
-import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Plus, Settings, X, Sparkles, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Plus, Settings, X, Sparkles, ShieldCheck, Star } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -9,6 +9,7 @@ export const TABS: [Tab, string, any][] = [
   ['create', 'New Business', Plus],
   ['branches', 'Branches', Store],
   ['features', 'Feature Requests', Sparkles],
+  ['reviews', 'Reviews', Star],
   ['permissions', 'Role Defaults', ShieldCheck],
   ['audit', 'Audit Logs', ScrollText],
   ['support', 'Support', LifeBuoy],

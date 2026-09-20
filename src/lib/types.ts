@@ -18,6 +18,8 @@ export interface Business {
   status: BusinessStatus;
   activation_expires_at: string | null;
   branches_enabled: boolean;
+  last_active_at: string | null;
+  last_activity_kind: string | null;
   created_at: string;
   updated_at: string;
 }

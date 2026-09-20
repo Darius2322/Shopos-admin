@@ -3,11 +3,13 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronRight } from 'lucide-react';
 import { Card, EmptyState, Skeleton, StatusBadge } from '../components/ui';
 import { Business } from '../lib/types';
+import { formatLastActive, activityLabel } from '../lib/time';
 
 export default function Businesses({ supabase, onOpen }: { supabase: SupabaseClient; onOpen: (id: string) => void }) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'created' | 'active'>('created');
 
   useEffect(() => { load(); }, []);
 
@@ -20,16 +22,23 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
 
   if (loading) return <Skeleton />;
 
-  const filtered = filter === 'all' ? businesses : businesses.filter((b) => b.status === filter);
+  const byStatus = filter === 'all' ? businesses : businesses.filter((b) => b.status === filter);
+  const filtered = sortBy === 'active'
+    ? [...byStatus].sort((a, b) => (b.last_active_at ?? '').localeCompare(a.last_active_at ?? ''))
+    : byStatus;
   const statuses = ['all', 'pending_activation', 'active', 'paused', 'suspended'];
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display font-semibold text-lg">Businesses</h2>
+        <div className="flex items-center gap-2"><select className="input w-auto text-xs py-1.5" value={sortBy} onChange={(e) => setSortBy(e.target.value as 'created' | 'active')} aria-label="Sort businesses">
+          <option value="created">Newest first</option>
+          <option value="active">Recently active</option>
+        </select>
         <select className="input w-auto text-xs py-1.5" value={filter} onChange={(e) => setFilter(e.target.value)}>
           {statuses.map((s) => <option key={s} value={s}>{s === 'all' ? 'All statuses' : s.replace(/_/g, ' ')}</option>)}
-        </select>
+        </select></div>
       </div>
       {filtered.length === 0 && <EmptyState message="No businesses match this filter." />}
       {filtered.map((b) => (
@@ -38,6 +47,9 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
             <div className="min-w-0">
               <div className="text-sm font-medium">{b.name}</div>
               <div className="text-xs text-slate-400">{b.email ?? 'No email'} · {new Date(b.created_at).toLocaleDateString()}</div>
+              <div className="text-xs text-slate-500 mt-0.5" title={b.last_active_at ? `${new Date(b.last_active_at).toLocaleString()}${b.last_activity_kind ? ' · ' + activityLabel(b.last_activity_kind) : ''}` : 'No activity recorded yet'}>
+                Last active: <span className="font-medium">{formatLastActive(b.last_active_at)}</span>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <StatusBadge status={b.status} />
