@@ -87,6 +87,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
   return (
     <Centered>
       <div className="w-full max-w-xs">
+        <img src="/logo-emblem.png" alt="ShopOS" width={56} height={56} className="w-14 h-14 rounded-2xl mb-3" />
         <h1 className="font-display font-semibold text-xl mb-1">ShopOS Admin</h1>
         <p className="text-sm text-slate-400 mb-5">Platform administrator sign-in</p>
         <form onSubmit={submit} className="card p-4 space-y-3">

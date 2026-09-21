@@ -45,7 +45,7 @@ function NavList({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void }) 
 function Brand() {
   return (
     <div className="flex items-center gap-2 px-4 py-4 shrink-0">
-      <div className="w-7 h-7 rounded-lg bg-field-600 flex items-center justify-center text-paper font-display font-semibold text-sm">S</div>
+      <img src="/logo-emblem.png" alt="ShopOS" width={28} height={28} className="w-7 h-7 rounded-lg object-contain" />
       <span className="font-display font-semibold">ShopOS Admin</span>
     </div>
   );
@@ -80,7 +80,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
           <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] bg-paper border-r border-slate-700 flex flex-col">
             <div className="flex items-center justify-between px-4 py-4 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-field-600 flex items-center justify-center text-paper font-display font-semibold text-sm">S</div>
+                <img src="/logo-emblem.png" alt="ShopOS" width={28} height={28} className="w-7 h-7 rounded-lg object-contain" />
                 <span className="font-display font-semibold">ShopOS Admin</span>
               </div>
               <button aria-label="Close menu" onClick={onCloseMobile} className="p-1 text-slate-400 hover:text-ink">
