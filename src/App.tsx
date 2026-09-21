@@ -1,187 +1,180 @@
-import { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from './lib/auth';
-import { AppShell } from './components/layout/AppShell';
-import { Login } from './features/auth/Login';
-import { Activation } from './features/auth/Activation';
-import { Dashboard } from './features/dashboard/Dashboard';
-// recharts is a genuinely heavy dependency (pushed the whole app's initial
-// bundle from ~620KB to over 1MB gzipped) for a page most sessions never
-// open — lazy-loaded so that weight is only fetched when someone actually
-// visits Profit & Loss, not on every login on every device.
-const PublicPages = lazy(() => import('./features/public/PublicPages'));
-const AnalyticsPage = lazy(() => import('./features/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
-import { POS } from './features/pos/POS';
-import { CustomerDisplay } from './features/pos/CustomerDisplay';
-import { InventoryList } from './features/inventory/InventoryList';
-import { CategoriesPage } from './features/inventory/CategoriesPage';
-import { CustomersList } from './features/customers/CustomersList';
-import { DebtsList } from './features/debts/DebtsList';
-import { PaymentsPage } from './features/payments/PaymentsPage';
-import { BranchesList } from './features/branches/BranchesList';
-import { SuppliersList } from './features/suppliers/SuppliersList';
-import { ExpensesList } from './features/expenses/ExpensesList';
-import { SyncCenter } from './features/settings/SyncCenter';
-import { SalesList } from './features/sales/SalesList';
-import { RefundsList } from './features/refunds/RefundsList';
-import { UsersList } from './features/users/UsersList';
-import { EmployeePayments } from './features/payroll/EmployeePayments';
-import { CorrectionsList } from './features/corrections/CorrectionsList';
-import { CancellationsList } from './features/cancellations/CancellationsList';
-import { QuotationsList } from './features/quotations/QuotationsList';
-import { InvoicesList } from './features/invoices/InvoicesList';
-import { SupportCenter } from './features/support/SupportCenter';
-import { Security } from './features/settings/Security';
-import { BusinessProfile } from './features/settings/BusinessProfile';
-import { LoyaltySettingsPage } from './features/settings/LoyaltySettingsPage';
-import { PrinterSettingsPage } from './features/settings/PrinterSettingsPage';
-import { Theme } from './features/settings/Theme';
-import { EndOfDay } from './features/closing/EndOfDay';
-import { SetupWizard, useWizardVisibility } from './features/onboarding/SetupWizard';
-import { NoticeBoard } from './features/notices/NoticeBoard';
-import { ResetPassword } from './features/auth/ResetPassword';
-import { AuditLog } from './features/audit/AuditLog';
-import { PublicReceipt } from './features/pos/PublicReceipt';
-import { Landing } from './features/landing/Landing';
-import { PUBLIC_PATHS } from './features/public/paths';
-import { ErrorBoundary } from './components/ErrorBoundary';
-
-function PageLoadingFallback() {
-  return <div className="p-8 text-center text-sm text-slate-400">Loading…</div>;
-}
+import { useEffect, useState } from 'react';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Menu } from 'lucide-react';
+import { supabase } from './lib/supabase';
+import { Centered } from './components/ui';
+import Sidebar, { Tab } from './components/Sidebar';
+import { GlobalSearch } from './components/GlobalSearch';
+import { NotificationsMenu } from './components/NotificationsMenu';
+import { ThemeToggle, useTheme } from './components/ThemeToggle';
+import Dashboard from './pages/Dashboard';
+import OwnerRequests from './pages/OwnerRequests';
+import Businesses from './pages/Businesses';
+import BusinessDetail from './pages/BusinessDetail';
+import CreateBusiness from './pages/CreateBusiness';
+import Branches from './pages/Branches';
+import FeatureRequests from './pages/FeatureRequests';
+import AuditLogs from './pages/AuditLogs';
+import Support from './pages/Support';
+import PlatformSettingsPage from './pages/PlatformSettings';
+import RoleDefaultsPage from './pages/RoleDefaults';
+import Reviews from './pages/Reviews';
 
 export default function App() {
-  const { loading, syncingInitialData, userId, business, bootstrap } = useAuth();
-  const wizardDismissed = useWizardVisibility((s) => s.dismissed);
-  const location = useLocation();
+  const [session, setSession] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { bootstrap(); }, []);
+  useEffect(() => {
+    if (!supabase) { setLoading(false); return; }
+    supabase.auth.getSession().then(async ({ data }) => {
+      setSession(data.session);
+      if (data.session) await checkAdmin(data.session.user.id);
+      setLoading(false);
+    });
+  }, []);
 
-  // Checked before ANY auth-state branching below — a password-recovery
-  // link establishes a real (if temporary) Supabase session the instant
-  // the page loads, which would otherwise make the normal userId-based
-  // routing treat it as a genuine login and drop the person straight into
-  // the app before they've actually set their new password.
-  if (location.pathname === '/reset-password') {
-    return <ResetPassword />;
+  async function checkAdmin(userId: string) {
+    if (!supabase) return;
+    const { data } = await supabase.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle();
+    setIsAdmin(!!data);
   }
 
-  // A scanned receipt QR code or a shared link must work for a complete
-  // stranger with no ShopOS account at all — checked before any auth
-  // branching below, same as /reset-password above, so it's never routed
-  // through the login screen.
-  if (location.pathname.startsWith('/r/')) {
-    return <PublicReceipt />;
+  if (!supabase) {
+    return <Centered><p className="text-sm text-slate-400">Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</p></Centered>;
   }
-
-  // Marketing + legal pages: open to anyone, signed in or not, and lazy-loaded
-  // so they add nothing to the POS bundle.
-  if (PUBLIC_PATHS.includes(location.pathname.replace(/\/+$/, ''))) {
-    return <Suspense fallback={<PageLoadingFallback />}><PublicPages /></Suspense>;
+  // Captured into a locally-typed const so nested closures below (onClick,
+  // onSignedIn) see the narrowed SupabaseClient type directly, instead of
+  // re-checking the outer `supabase` import's SupabaseClient | null type —
+  // TS doesn't carry a null-guard across a function boundary, even though
+  // it's logically safe here since this is a plain, never-reassigned const.
+  const client = supabase;
+  if (loading) return <Centered><p className="text-sm text-slate-400">Loading…</p></Centered>;
+  if (!session) {
+    return <Login supabase={client} onSignedIn={async (uid) => { await checkAdmin(uid); setSession(await client.auth.getSession().then(r => r.data.session)); }} />;
   }
-
-  if (loading) {
+  if (isAdmin === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <div className="text-sm text-slate-500">Loading ShopOS…</div>
-      </div>
+      <Centered>
+        <p className="text-sm text-rust-500 mb-3">This account isn't a platform admin.</p>
+        <button className="btn-secondary text-sm" onClick={() => client.auth.signOut().then(() => setSession(null))}>Sign out</button>
+      </Centered>
     );
   }
+  if (isAdmin === null) return <Centered><p className="text-sm text-slate-400">Checking access…</p></Centered>;
 
-  if (userId && syncingInitialData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <div className="text-sm text-slate-500">Setting up your business…</div>
-      </div>
-    );
-  }
+  return <Shell supabase={client} onSignOut={() => { client.auth.signOut(); setSession(null); }} />;
+}
 
-  if (userId && !business) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-paper p-6 text-center">
-        <p className="text-sm font-medium mb-1">No business found for this account</p>
-        <p className="text-sm text-slate-500 max-w-xs mb-4">
-          This can happen if your account was just created and hasn't synced yet, or if you're offline.
-        </p>
-        <button onClick={() => useAuth.getState().refresh()} className="btn-primary text-sm mb-3">Try again</button>
-        <button onClick={() => useAuth.getState().signOut()} className="text-xs text-slate-400 hover:text-ink">Sign out</button>
-      </div>
-    );
-  }
+function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn: (uid: string) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  if (userId && business && business.status === 'pending_activation') {
-    return <Activation />;
-  }
-
-  if (userId && business && (business.status === 'paused' || business.status === 'suspended')) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-paper p-6 text-center">
-        <p className="text-sm font-medium mb-1">This business is {business.status}</p>
-        <p className="text-sm text-slate-500 max-w-xs mb-4">Contact ShopOS support if you believe this is a mistake.</p>
-        <button onClick={() => useAuth.getState().signOut()} className="text-xs text-slate-400 hover:text-ink">Sign out</button>
-      </div>
-    );
-  }
-
-  if (userId && business && business.status === 'active' && !business.onboardingCompleted && !wizardDismissed) {
-    return <SetupWizard onFinish={() => {}} />;
-  }
-
-  if (!userId) {
-    return (
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/login/:slug" element={<Login />} />
-        <Route path="*" element={<Landing />} />
-      </Routes>
-    );
-  }
-
-  // Customer Display is a separate physical/browser window meant to face
-  // the customer — it deliberately renders with no sidebar, no nav, and no
-  // route back into the rest of the app, so it's pulled out here rather
-  // than nested inside <AppShell>.
-  if (location.pathname === '/customer-display') {
-    return <CustomerDisplay />;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null); setBusy(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (data.user) onSignedIn(data.user.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed');
+    } finally { setBusy(false); }
   }
 
   return (
-    <AppShell>
-      <ErrorBoundary key={location.pathname}>
-        <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/analytics" element={<Suspense fallback={<PageLoadingFallback />}><AnalyticsPage /></Suspense>} />
-        <Route path="/pos" element={<POS />} />
-        <Route path="/sales" element={<SalesList />} />
-        <Route path="/inventory" element={<InventoryList />} />
-        <Route path="/categories" element={<CategoriesPage />} />
-        <Route path="/customers" element={<CustomersList />} />
-        <Route path="/debts" element={<DebtsList />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/refunds" element={<RefundsList />} />
-        <Route path="/corrections" element={<CorrectionsList />} />
-        <Route path="/cancellations" element={<CancellationsList />} />
-        <Route path="/quotations" element={<QuotationsList />} />
-        <Route path="/invoices" element={<InvoicesList />} />
-        <Route path="/support" element={<SupportCenter />} />
-        <Route path="/security" element={<Security />} />
-        <Route path="/business-profile" element={<BusinessProfile />} />
-        <Route path="/loyalty-settings" element={<LoyaltySettingsPage />} />
-        <Route path="/printer-settings" element={<PrinterSettingsPage />} />
-        <Route path="/theme" element={<Theme />} />
-        <Route path="/end-of-day" element={<EndOfDay />} />
-        <Route path="/notices" element={<NoticeBoard />} />
-        <Route path="/suppliers" element={<SuppliersList />} />
-        <Route path="/expenses" element={<ExpensesList />} />
-        <Route path="/employee-payments" element={<EmployeePayments />} />
-        <Route path="/users" element={<UsersList />} />
-        <Route path="/audit-log" element={<AuditLog />} />
-        <Route path="/branches" element={<BranchesList />} />
-        <Route path="/sync" element={<SyncCenter />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </ErrorBoundary>
-    </AppShell>
+    <Centered>
+      <div className="w-full max-w-xs">
+        <img src="/logo-emblem.png" alt="ShopOS" width={56} height={56} className="w-14 h-14 rounded-2xl mb-3" />
+        <h1 className="font-display font-semibold text-xl mb-1">ShopOS Admin</h1>
+        <p className="text-sm text-slate-400 mb-5">Platform administrator sign-in</p>
+        <form onSubmit={submit} className="card p-4 space-y-3">
+          <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {error && <p className="text-xs text-rust-500">{error}</p>}
+          <button className="btn-primary w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        </form>
+        <p className="text-xs text-slate-500 mt-5 text-center max-w-xs mx-auto">
+          This portal is for the ShopOS platform administrator only. There is no self-service access here —
+          admin accounts are created directly in the database.
+        </p>
+      </div>
+    </Centered>
+  );
+}
+
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+};
+
+function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [openBusinessId, setOpenBusinessId] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [theme, toggleTheme] = useTheme();
+
+  function openBusiness(id: string) {
+    setOpenBusinessId(id);
+    setTab('businesses');
+  }
+
+  function selectTab(key: Tab) {
+    setTab(key);
+    if (key !== 'businesses') setOpenBusinessId(null);
+  }
+
+  return (
+    // Sidebar and content are separate flex columns, each with their own
+    // height/overflow — scrolling one never moves the other, and on phones
+    // the sidebar becomes a drawer opened from the hamburger button below
+    // instead of a horizontal tab strip that could hide items off-screen.
+    <div className="h-screen flex overflow-hidden bg-paper text-ink">
+      <Sidebar tab={tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
+
+      <div className="flex-1 min-w-0 flex flex-col h-screen">
+        <header className="shrink-0 border-b border-slate-700 bg-paper">
+          <div className="flex items-center gap-3 px-4 py-3 lg:hidden">
+            <button aria-label="Open menu" onClick={() => setMobileNavOpen(true)} className="p-1.5 -ml-1.5 text-slate-400 hover:text-ink">
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="font-display font-semibold text-sm">{TAB_LABELS[tab]}</span>
+          </div>
+
+          {/* This utility bar (theme / notifications / search) is rendered
+              once, identically on mobile and desktop, so it's never the
+              thing that goes missing when the viewport shrinks. */}
+          <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 lg:border-t-0">
+            <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} />
+            <div className="flex items-center gap-1 ml-auto">
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-5">
+          <div className="max-w-3xl mx-auto">
+            {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} />}
+            {tab === 'requests' && <OwnerRequests supabase={supabase} />}
+            {tab === 'businesses' && (
+              openBusinessId
+                ? <BusinessDetail supabase={supabase} businessId={openBusinessId} onBack={() => setOpenBusinessId(null)} />
+                : <Businesses supabase={supabase} onOpen={setOpenBusinessId} />
+            )}
+            {tab === 'create' && <CreateBusiness supabase={supabase} onCreated={openBusiness} />}
+            {tab === 'branches' && <Branches supabase={supabase} onOpenBusiness={openBusiness} />}
+            {tab === 'features' && <FeatureRequests supabase={supabase} />}
+            {tab === 'reviews' && <Reviews supabase={supabase} />}
+            {tab === 'audit' && <AuditLogs supabase={supabase} />}
+            {tab === 'support' && <Support supabase={supabase} />}
+            {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
+            {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }
