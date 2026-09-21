@@ -1,0 +1,15 @@
+<!-- Merge into the Android app's AndroidManifest.xml.
+     Only RECEIVE_SMS. Do NOT add READ_SMS: live detection does not need it, and asking for less
+     is both the privacy promise and the easier Play review. -->
+<uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+<application ...>
+    <receiver
+        android:name="com.dmn.shopos.mpesa.MpesaSmsReceiver"
+        android:exported="true"
+        android:permission="android.permission.BROADCAST_SMS">
+        <intent-filter android:priority="0">
+            <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+        </intent-filter>
+    </receiver>
+</application>

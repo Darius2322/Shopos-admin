@@ -1,0 +1,4 @@
+-- Applied to production. get_public_receipt now returns every field the printed receipt shows,
+-- including the M-Pesa reference (extracted from the sale note by pattern; the free-text note itself
+-- and any customer details are NOT exposed). Token must be 48 hex chars.
+-- (See the live function definition; this file documents the change.)
