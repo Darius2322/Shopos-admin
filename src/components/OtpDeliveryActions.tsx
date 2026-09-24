@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Copy, Check, MessageCircle, Mail } from 'lucide-react';
 import { supabaseUrl } from '../lib/supabase';
+import { toWhatsAppNumber } from '../lib/phone';
 
 interface OtpDeliveryActionsProps {
   supabase: SupabaseClient;
@@ -28,7 +29,9 @@ export function OtpDeliveryActions({ supabase, code, businessName, phone, email 
   function whatsapp() {
     if (!phone) return;
     const message = encodeURIComponent(`Your ShopOS activation code for ${businessName} is: ${code}\n\nIt expires in 15 minutes.`);
-    window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
+    // Kenyan numbers are usually entered as 07xx/01xx locally; WhatsApp needs the country code
+    // (254...) or it refuses to open the chat at all ("missing a country code") — see toWhatsAppNumber.
+    window.open(`https://wa.me/${toWhatsAppNumber(phone)}?text=${message}`, '_blank');
   }
 
   async function sendEmail() {
