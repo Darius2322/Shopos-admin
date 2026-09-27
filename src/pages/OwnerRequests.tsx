@@ -21,7 +21,7 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('owner_requests').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('owner_requests').select('*').order('created_at', { ascending: false }).limit(200);
     setRequests(data ?? []);
     setLoading(false);
   }

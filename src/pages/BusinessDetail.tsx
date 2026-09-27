@@ -10,6 +10,7 @@ import { supabaseUrl } from '../lib/supabase';
 
 const SECTIONS = [
   { id: 'section-overview', label: 'Overview & status' },
+  { id: 'section-usage', label: 'Usage & activity' },
   { id: 'section-activation', label: 'Activation & access' },
   { id: 'section-branches', label: 'Branches' },
   { id: 'section-owner', label: 'Owner' },
@@ -25,6 +26,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   const [branches, setBranches] = useState<Branch[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [otpHistory, setOtpHistory] = useState<OtpStatusRow[]>([]);
+  const [usage, setUsage] = useState<Record<string, number> | null>(null);
+  const [activity, setActivity] = useState<{ id: string; action: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +39,20 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
 
   async function load() {
     setLoading(true);
-    const [biz, br, pr, otp] = await Promise.all([
+    const [biz, br, pr, otp, us, act] = await Promise.all([
       supabase.from('businesses').select('*').eq('id', businessId).single(),
       supabase.from('branches').select('*').eq('business_id', businessId).order('created_at'),
       supabase.from('profiles').select('*').eq('business_id', businessId).order('created_at'),
       supabase.rpc('admin_otp_status', { p_business_id: businessId }),
+      supabase.rpc('admin_business_usage', { p_business_id: businessId }),
+      supabase.from('audit_log').select('id, action, created_at').eq('business_id', businessId).order('created_at', { ascending: false }).limit(15),
     ]);
     setBusiness(biz.data ?? null);
     setBranches(br.data ?? []);
     setProfiles(pr.data ?? []);
     setOtpHistory(otp.data ?? []);
+    setUsage((us.data as Record<string, number>) ?? null);
+    setActivity(act.data ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, [businessId]);
@@ -221,6 +228,42 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
           )}
         </div>
       </Card>
+
+      <div id="section-usage" className="section-anchor">
+        <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Usage & activity</h3>
+        <Card className="mb-2">
+          <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+            <div><span className="text-slate-500">Last active</span><div className="text-sm font-medium">{business.last_active_at ? new Date(business.last_active_at).toLocaleString() : 'Never'}{business.last_activity_kind ? ` · ${business.last_activity_kind.replace(/_/g, ' ')}` : ''}</div></div>
+            <div><span className="text-slate-500">Last sale</span><div className="text-sm font-medium">{usage?.last_sale_at ? new Date(usage.last_sale_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
+          </div>
+          {usage ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-center">
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.products}</div><div className="text-[10px] text-slate-400">Products</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.customers}</div><div className="text-[10px] text-slate-400">Customers</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.sales}</div><div className="text-[10px] text-slate-400">Sales</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{Number(usage.sales_total).toLocaleString()}</div><div className="text-[10px] text-slate-400">{business.currency} sold</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.debts}</div><div className="text-[10px] text-slate-400">Debts</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{Number(usage.debts_outstanding).toLocaleString()}</div><div className="text-[10px] text-slate-400">Owed</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.quotations}</div><div className="text-[10px] text-slate-400">Quotations</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.invoices}</div><div className="text-[10px] text-slate-400">Invoices</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.expenses}</div><div className="text-[10px] text-slate-400">Expenses</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.users}</div><div className="text-[10px] text-slate-400">Users</div></div>
+            </div>
+          ) : <p className="text-xs text-slate-500">Usage figures unavailable.</p>}
+        </Card>
+        <details>
+          <summary className="text-xs text-slate-400 cursor-pointer">Recent activity ({activity.length})</summary>
+          <div className="mt-2 space-y-1.5">
+            {activity.length === 0 && <p className="text-xs text-slate-500">No recorded events yet.</p>}
+            {activity.map((a) => (
+              <div key={a.id} className="text-xs text-slate-400 flex items-center justify-between">
+                <span>{a.action.replace(/_/g, ' ')}</span>
+                <span>{new Date(a.created_at).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
 
       {reasonPromptFor && (
         <Card>

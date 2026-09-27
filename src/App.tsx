@@ -19,6 +19,7 @@ import Support from './pages/Support';
 import PlatformSettingsPage from './pages/PlatformSettings';
 import RoleDefaultsPage from './pages/RoleDefaults';
 import Reviews from './pages/Reviews';
+import AppReleases from './pages/AppReleases';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -107,7 +108,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -172,6 +173,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'support' && <Support supabase={supabase} />}
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
             {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
+            {tab === 'releases' && <AppReleases supabase={supabase} />}
           </div>
         </main>
       </div>

@@ -1,56 +1,50 @@
-# ShopOS Admin
+# ShopOS Admin — App Update System files
 
-Platform administrator portal — a separate app from `../shopos`, never linked
-from inside it, gated by the `platform_admins` table (populated manually in
-Supabase, no self-serve admin signup).
+Complete, final versions of the files touched — drop into your repo at the
+matching path under `src/`, commit, deploy.
 
-## Phase 1 (this round)
+Adds an **App Updates** tab: create/edit/publish/unpublish/delete release
+entries for either the ShopOS app or the admin portal, from one screen. The
+target app is required per release and locked once created, so a ShopOS-app
+release can't drift into showing as an admin-portal release or vice versa.
 
-The portal was previously three thin sections (Owner Requests, Businesses,
-Support) with no dashboard, no branch visibility, and no activation
-management beyond what the approve-owner flow produced once. This round
-added:
+No new dependencies — uses the same Supabase client and `Card`/`ErrorText`/
+`Skeleton`/`StatusBadge` components already in the project.
 
-- **Dashboard** — platform-wide counts (businesses by status, branches,
-  owners, employees, pending owner requests) and a recently-registered list
-- **Owner Requests** — reject/request-info now record a reason and go
-  through `admin_decide_owner_request()`, and status includes
-  `info_requested`, not just pending/approved/rejected
-- **Businesses → detail view** — click into a business to see its owner,
-  branches, and employees, and to change status (activate/pause/suspend)
-  with a required reason, logged to `admin_actions`
-- **Activation management** — inside a business's detail view: see
-  outstanding/expired/used codes (`admin_otp_status`, exposes attempts and
-  expiry only — never the hash), regenerate (`admin_generate_otp`), or
-  revoke (`admin_revoke_otp`) a code
-- **Branches** — every branch across every business in one searchable list,
-  linking back into that business's detail view
-- **Audit Logs** — two tabs: platform-level `admin_actions` (every admin
-  decision, with reason) and per-business `audit_log` (tenant activity),
-  both admin-readable now via new RLS policies
+See the main `shopos-app-changes.zip` README for the full picture of what's
+done across both apps.
 
-### Required migration
+## Admin portal §15–21 progress (this pass)
 
-Run `../shopos/supabase/schema_part7.sql` once, after parts 1–6, against
-your existing Supabase project. It's additive — adds `admin_actions`, an
-`owner_requests.decision_reason` column, the `info_requested` status, and
-the `admin_*` security-definer functions listed above. Doesn't touch
-existing data.
+**Two new database functions** (already applied live:
+`phase29_admin_business_stats`) — `admin_business_usage(business_id)` and
+`admin_platform_totals()`. Needed because `sales` has no admin-read RLS
+policy (unlike `businesses`/`profiles`/`device_sessions`/`audit_log`/
+`security_events`, which already do) — rather than opening broad read
+access to every business's raw sale rows, these return only the aggregate
+counts the admin portal needs, consistent with every other `admin_*`
+function in your schema.
 
-### Still not built (later phases)
+- **§16 Dashboard** — added new businesses (7d), active-today/week/month
+  (from `businesses.last_active_at`, already tracked), total sales
+  processed + transactions + today's sales (via the new RPC), total/active
+  users, unpublished-release count. **Not added:** "system errors" and
+  "failed sync events" — there's no server-side table for either (sync
+  failures are local-device state by definition), so I left them out rather
+  than fabricate a number.
+- **§17 Business Detail** — new "Usage & activity" section: last active,
+  last sale, and counts for products/customers/sales/debts/quotations/
+  invoices/expenses/users, plus a recent-activity list from the audit log.
+- **§18–19 Login/activity analytics** — the Audit Logs page now has a third
+  tab, "Logins & security," pulling from `security_events` (successful vs.
+  failed logins, with counts), plus a shared date filter (today/7d/30d/all)
+  across all three tabs.
+- **§20 Business search & filtering** — added search by name/email/phone,
+  an activity filter (active in 7d/30d, inactive 30+ days), a registration
+  date range, and a per-business user count in the list.
+- **§21 System logs** — the date filter above extends to admin actions and
+  business activity too, not just security events.
 
-Full **Branch Profile** drill-down (today/weekly/monthly sales, inventory
-value, stock movements, per-branch daily closings) — the current Businesses
-→ Branches view is a list with status only, not the full profile the spec
-describes. Platform-wide **Analytics** and **Platform Settings** sections.
-Notice board admin controls (platform-wide notices). These need either new
-read paths into sales/inventory data scoped for admin, or, in the case of
-Platform Settings, deciding what's actually configurable — worth scoping
-together before building rather than guessing.
-
-## Setup
-
-Same as `../shopos`: `npm install`, copy `.env.example` to `.env` with your
-Supabase URL + anon key, `npm run dev`. Deploy as its own Vercel project
-(separate from the main app) with the same two env vars, per the main
-README's "Deploying the admin portal" section.
+**Not done:** §15's actual visual redesign (typography, spacing, color
+system) — everything above is functional/data work on the existing look,
+not a restyle. That's still a dedicated pass if you want it.
