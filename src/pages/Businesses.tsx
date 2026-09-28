@@ -33,8 +33,6 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
     setLoading(false);
   }
 
-  if (loading) return <Skeleton />;
-
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
 
@@ -63,6 +61,8 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
       ? [...rows].sort((a, b) => (b.last_active_at ?? '').localeCompare(a.last_active_at ?? ''))
       : rows;
   }, [businesses, filter, activityFilter, dateFrom, dateTo, query, sortBy]);
+
+  if (loading) return <Skeleton />;
 
   const statuses = ['all', 'pending_activation', 'active', 'paused', 'suspended'];
 
