@@ -27,7 +27,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [otpHistory, setOtpHistory] = useState<OtpStatusRow[]>([]);
   const [usage, setUsage] = useState<Record<string, number> | null>(null);
-  const [activity, setActivity] = useState<{ id: string; action: string; created_at: string }[]>([]);
+  const [activity, setActivity] = useState<{ occurred_at: string; kind: string; detail: string | null; actor_name: string | null; was_offline: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +45,14 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
       supabase.from('profiles').select('*').eq('business_id', businessId).order('created_at'),
       supabase.rpc('admin_otp_status', { p_business_id: businessId }),
       supabase.rpc('admin_business_usage', { p_business_id: businessId }),
-      supabase.from('audit_log').select('id, action, created_at').eq('business_id', businessId).order('created_at', { ascending: false }).limit(15),
+      supabase.rpc('admin_activity_feed', { p_business_id: businessId, p_limit: 60 }),
     ]);
     setBusiness(biz.data ?? null);
     setBranches(br.data ?? []);
     setProfiles(pr.data ?? []);
     setOtpHistory(otp.data ?? []);
     setUsage((us.data as Record<string, number>) ?? null);
-    setActivity(act.data ?? []);
+    setActivity((act.data as any[]) ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, [businessId]);
@@ -235,7 +235,17 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
           <div className="grid grid-cols-2 gap-3 text-xs mb-3">
             <div><span className="text-slate-500">Last active</span><div className="text-sm font-medium">{business.last_active_at ? new Date(business.last_active_at).toLocaleString() : 'Never'}{business.last_activity_kind ? ` · ${business.last_activity_kind.replace(/_/g, ' ')}` : ''}</div></div>
             <div><span className="text-slate-500">Last sale</span><div className="text-sm font-medium">{usage?.last_sale_at ? new Date(usage.last_sale_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
+            <div><span className="text-slate-500">Last login</span><div className="text-sm font-medium">{usage?.last_login_at ? new Date(usage.last_login_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
+            <div><span className="text-slate-500">Last inventory update</span><div className="text-sm font-medium">{usage?.last_inventory_update_at ? new Date(usage.last_inventory_update_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
+            <div className="col-span-2"><span className="text-slate-500">Last offline session (uploaded after reconnecting)</span><div className="text-sm font-medium">{usage?.last_offline_session_at ? new Date(usage.last_offline_session_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
           </div>
+          {usage && (
+            <div className="grid grid-cols-3 gap-2 text-center mb-3">
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.logins_today}</div><div className="text-[10px] text-slate-400">Logins today</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.logins_7d}</div><div className="text-[10px] text-slate-400">Logins, 7 days</div></div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.logins_30d}</div><div className="text-[10px] text-slate-400">Logins, 30 days</div></div>
+            </div>
+          )}
           {usage ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-center">
               <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.products}</div><div className="text-[10px] text-slate-400">Products</div></div>
@@ -251,14 +261,18 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </div>
           ) : <p className="text-xs text-slate-500">Usage figures unavailable.</p>}
         </Card>
-        <details>
-          <summary className="text-xs text-slate-400 cursor-pointer">Recent activity ({activity.length})</summary>
+        <details open>
+          <summary className="text-xs text-slate-400 cursor-pointer">Activity timeline ({activity.length})</summary>
           <div className="mt-2 space-y-1.5">
             {activity.length === 0 && <p className="text-xs text-slate-500">No recorded events yet.</p>}
-            {activity.map((a) => (
-              <div key={a.id} className="text-xs text-slate-400 flex items-center justify-between">
-                <span>{a.action.replace(/_/g, ' ')}</span>
-                <span>{new Date(a.created_at).toLocaleString()}</span>
+            {activity.map((a, i) => (
+              <div key={i} className="text-xs text-slate-400 flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  {a.actor_name ? <b className="text-slate-300 font-medium">{a.actor_name} · </b> : null}
+                  {a.kind.replace(/_/g, ' ')}{a.detail ? ` (${a.detail.replace(/_/g, ' ')})` : ''}
+                  {a.was_offline && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-300">offline session</span>}
+                </span>
+                <span className="shrink-0 tnum">{new Date(a.occurred_at).toLocaleString()}</span>
               </div>
             ))}
           </div>

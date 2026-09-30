@@ -1,50 +1,31 @@
-# ShopOS Admin — App Update System files
+# ShopOS – this round (drop-in files, same paths under `src/`)
 
-Complete, final versions of the files touched — drop into your repo at the
-matching path under `src/`, commit, deploy.
+Database (already applied live to project ShopOs via migrations phase30–32):
+- `inventory_movements`: + `note`, `quantity_before`; insert guard (needs inventory.adjust, same-business product, actor forced to auth.uid()).
+- `businesses.document_template` (classic|modern|compact|ledger|bold) – only owner / business.settings can change (trigger).
+- `document_shares` + `create_document_share` / `revoke_document_share` / `get_public_document_full` (quotation + invoice links; cross-business creation rejected – tested).
+- `client_activity_events` + `record_client_activity()` – offline sessions uploaded with real timestamps; advances last_active_at / last_login_at / login counts.
+- Admin RPCs: `admin_transactions_per_day`, `admin_top_businesses`, `admin_activity_feed`, upgraded `admin_business_usage` (all check is_platform_admin).
 
-Adds an **App Updates** tab: create/edit/publish/unpublish/delete release
-entries for either the ShopOS app or the admin portal, from one screen. The
-target app is required per release and locked once created, so a ShopOS-app
-release can't drift into showing as an admin-portal release or vice versa.
+## shopos-app (`app/src`)
+- NEW `lib/documentTemplates.ts`, `components/DocumentView.tsx` – 5 ShopOS-branded templates (footer cannot be removed).
+- NEW `components/ShareDocumentSheet.tsx`, `lib/documentShare.ts`, `lib/documentData.ts` – "Send digital receipt/quotation/invoice": WhatsApp / SMS / copy / native share as link, or share as picture (works offline).
+- NEW `features/documents/PublicDocument.tsx` (route `/d/<token>`), `DocumentTemplatesPage.tsx` (More → Document Templates).
+- NEW `lib/clientActivity.ts` – offline-safe session log. `lib/auth.ts` records app opens.
+- NEW `features/inventory/StockAdjustSheet.tsx`; `lib/products.ts` `adjustStock()` – Add / Remove / Set, reason, note, before→after, audit event; product page history shows who/why/note.
+- `InventoryList.tsx`: category menu (chips + counts + inline "New category"), richer dashboard (units, retail value, potential profit, expiring, stock-health bar, top categories), sort + supplier + stock-status filters, quick adjust per row.
+- `lib/sync.ts`: finished items leave the queue and counters immediately; duplicate queue entries collapse; activity flushed after sync.
+- `index.css`: visible hover/pressed states in dark mode (desktop).
+- `MoreMenu.tsx` / `AppShell.tsx`: items flagged `comingSoon` (M-Pesa) are inert with a "Coming soon" badge.
+- Routes added in `App.tsx`; types in `lib/types.ts`.
 
-No new dependencies — uses the same Supabase client and `Card`/`ErrorText`/
-`Skeleton`/`StatusBadge` components already in the project.
+## shopos-admin (`admin/src/pages`)
+- `Dashboard.tsx`: transactions per day chart (7/30/90d) + top performing shops with growth vs prior period.
+- `BusinessDetail.tsx`: last login, last inventory update, last offline session, logins today/7d/30d, merged activity timeline (flags offline sessions).
 
-See the main `shopos-app-changes.zip` README for the full picture of what's
-done across both apps.
-
-## Admin portal §15–21 progress (this pass)
-
-**Two new database functions** (already applied live:
-`phase29_admin_business_stats`) — `admin_business_usage(business_id)` and
-`admin_platform_totals()`. Needed because `sales` has no admin-read RLS
-policy (unlike `businesses`/`profiles`/`device_sessions`/`audit_log`/
-`security_events`, which already do) — rather than opening broad read
-access to every business's raw sale rows, these return only the aggregate
-counts the admin portal needs, consistent with every other `admin_*`
-function in your schema.
-
-- **§16 Dashboard** — added new businesses (7d), active-today/week/month
-  (from `businesses.last_active_at`, already tracked), total sales
-  processed + transactions + today's sales (via the new RPC), total/active
-  users, unpublished-release count. **Not added:** "system errors" and
-  "failed sync events" — there's no server-side table for either (sync
-  failures are local-device state by definition), so I left them out rather
-  than fabricate a number.
-- **§17 Business Detail** — new "Usage & activity" section: last active,
-  last sale, and counts for products/customers/sales/debts/quotations/
-  invoices/expenses/users, plus a recent-activity list from the audit log.
-- **§18–19 Login/activity analytics** — the Audit Logs page now has a third
-  tab, "Logins & security," pulling from `security_events` (successful vs.
-  failed logins, with counts), plus a shared date filter (today/7d/30d/all)
-  across all three tabs.
-- **§20 Business search & filtering** — added search by name/email/phone,
-  an activity filter (active in 7d/30d, inactive 30+ days), a registration
-  date range, and a per-business user count in the list.
-- **§21 System logs** — the date filter above extends to admin actions and
-  business activity too, not just security events.
-
-**Not done:** §15's actual visual redesign (typography, spacing, color
-system) — everything above is functional/data work on the existing look,
-not a restyle. That's still a dedicated pass if you want it.
+## Not verified / needs you
+- I only had the change bundles, not the full repos, so nothing was compiled here. Run `tsc`/build once after copying.
+- `lib/db.ts`, `lib/audit.ts` weren't in the bundle; I used the exports the existing code already imports (`db`, `newRecordBase`, `enqueueSync`, `recordAuditEvent`). Confirm `db.suppliers` and `db.businesses` exist.
+- Mark M-Pesa entry `comingSoon: true` in the nav item list in `AppShell.tsx` if it isn't already (the rendering support is added; I saw the existing Coming Soon page but not the flag).
+- Receipt popup/print (`ReceiptModal`, `PublicReceipt`) still use their existing layout; templates are applied to the new share sheet, public `/d/` links and the preview.
+- Test on a real Android device: share-as-picture uses SVG foreignObject; logos from other domains need CORS, otherwise the logo is omitted from the picture.
