@@ -53,3 +53,25 @@ CHANGED: `AppShell.tsx` (search + avatar menu + quick actions on dashboard), `Mo
 - Dashboard shortcuts render above the dashboard via AppShell (I couldn't see Dashboard.tsx).
 - Deposits are online-only on purpose (to prevent two devices spending the same balance); using a deposit as payment at the POS is not built yet.
 - Product pictures are stored as small compressed images on the product (work offline, sync with the product).
+
+
+---
+# Round 4
+
+## Already live in Supabase (migrations phase34, phase35)
+- Secure links: every receipt/quotation/invoice link now EXPIRES (7/30/90/365 days, default 30), can be TURNED OFF, counts views, and stays 192-bit unguessable. Links already sent keep working for 90 more days. Pages send `noindex` + no-referrer.
+- Templates: 10 layouts (5 new: Minimal, Elegant, Stripe, Corporate, Soft) + a brand colour per business (`businesses.document_accent`).
+- `get_shopos_contact()`: ShopOS phone / WhatsApp / email / slogan from `platform_settings` (admin-editable). The slogan is a PLACEHOLDER ("Smart tools for every shop"); change it with:
+  `update platform_settings set slogan = 'YOUR SLOGAN' where id = 'default';`
+- Unique offline numbers: `reserve_document_numbers()` gives each device its own block of real numbers (tested: blocks never overlap).
+
+## App
+NEW: `lib/numberBlocks.ts` (offline-unique numbers, installed in App.tsx), `lib/brand.ts`, `components/PersonAvatar.tsx`, `RecordDebtSheet.tsx`, `AddDepositModal.tsx`, `features/closing/ClosingHistoryPage.tsx` (More > Previous Days), `features/profile/ProfilePage.tsx` (avatar menu > My profile), `features/debts/DepositsTab.tsx`, `features/expenses/ExpensesList.tsx` + `ExpenseDetailPage.tsx`, `features/public/ReviewForm.tsx`.
+CHANGED: dashboard shortcuts (3 groups + clickable Recent sales / Low stock / Owed to you), customer page (avatar, quick actions: Record debt, Add deposit, New sale, Call, WhatsApp; tabs), debts list/detail (avatars, timestamps, tabs, Call/WhatsApp), Documents group in More now holds Templates, live search from the first letter, public receipt/quotation/invoice page (Close, Call/WhatsApp shop, Call ShopOS, logo + slogan), share sheet (expiry + Turn off link + Close).
+
+## Needs you
+- `ExpensesList.tsx` REPLACES your file (I couldn't see it). Rows open details; the repeat button re-records the same expense for today. No edit/delete: expenses have no delete column on the server.
+- Landing page review form: I couldn't see it. Replace its form with `<ReviewForm />` (blank name = Anonymous; the database already does this).
+- `/r/` receipt links now use the new public page (the old `PublicReceipt` is no longer routed).
+- Dashboard.tsx wasn't available: shortcuts and clickable records are added above it via AppShell. If you send Dashboard.tsx I can make its own tiles clickable and remove duplicates.
+- Deposits and Previous Days need a connection.
