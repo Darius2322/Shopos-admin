@@ -26,6 +26,30 @@ Database (already applied live to project ShopOs via migrations phase30–32):
 ## Not verified / needs you
 - I only had the change bundles, not the full repos, so nothing was compiled here. Run `tsc`/build once after copying.
 - `lib/db.ts`, `lib/audit.ts` weren't in the bundle; I used the exports the existing code already imports (`db`, `newRecordBase`, `enqueueSync`, `recordAuditEvent`). Confirm `db.suppliers` and `db.businesses` exist.
-- Mark M-Pesa entry `comingSoon: true` in the nav item list in `AppShell.tsx` if it isn't already (the rendering support is added; I saw the existing Coming Soon page but not the flag).
+- M-Pesa is already flagged comingSoon in AppShell; the nav item type now allows it.
 - Receipt popup/print (`ReceiptModal`, `PublicReceipt`) still use their existing layout; templates are applied to the new share sheet, public `/d/` links and the preview.
 - Test on a real Android device: share-as-picture uses SVG foreignObject; logos from other domains need CORS, otherwise the logo is omitted from the picture.
+
+---
+# Round 3 (soft delete, consent, deposits, search, avatars, categories, admin tabs)
+
+## Already live in Supabase (project ShopOs)
+- Migration `phase33`: soft-delete columns on businesses/profiles (+ `auth_business_id()` now ignores deleted businesses, so RLS hides them), `account_deletions` log, `consent_documents` / `account_consents`, `customer_deposits` ledger + `record_customer_deposit()` / `customer_deposit_balance()` (tested: overdraw blocked, other business blocked), unused `product-images` bucket (can be ignored/removed).
+- Edge functions: `delete-my-account` v2 (SOFT: bans sign-ins, revokes sessions, keeps data 30 days), `admin-delete-business` v2 (soft by default; `purge:true` only for already-deleted), NEW `admin-restore-business`, `claim-owner-account` v8 (records consent).
+- Consent notice v1.0 is seeded with `enforced = false`. **After you wire `<ConsentBox>` into the account-setup screen, turn enforcement on:**
+  `update consent_documents set enforced = true where is_current;`
+  (Until then nobody is blocked; existing users get a one-time prompt once enforced.) Have a lawyer review the notice text.
+
+## App files
+NEW: `components/UniversalSearch.tsx`, `components/layout/UserMenu.tsx`, `components/ProductAvatar.tsx`, `components/DeleteAccountDialog.tsx`, `components/ConsentBox.tsx`, `features/dashboard/QuickActions.tsx`, `features/customers/DepositCard.tsx`, `features/categories/CategoryDetailPage.tsx`
+CHANGED: `AppShell.tsx` (search + avatar menu + quick actions on dashboard), `MoreMenu.tsx` (Theme tile + Categories tile removed), `App.tsx` (route /categories/:id, ConsentGate), `InventoryList.tsx` (product pictures, add to category: new + existing), `CustomerDetailPage.tsx` (deposit card), `lib/products.ts`.
+
+## Admin files
+`pages/BusinessDetail.tsx` (tabs: Overview, Activity, Users, Access & branches, Consent, Account; soft delete / restore / permanently erase), `pages/Businesses.tsx` (deleted filter + badge).
+
+## Needs you
+- Wire `<ConsentBox onChange={(accepted, version) => ...}/>` into the owner account-setup page and send `{ acceptedTerms, termsVersion }` to `claim-owner-account`. I couldn't see that page.
+- `DeleteAccountDialog.tsx` REPLACES your existing one (same props). Check it still matches your look.
+- Dashboard shortcuts render above the dashboard via AppShell (I couldn't see Dashboard.tsx).
+- Deposits are online-only on purpose (to prevent two devices spending the same balance); using a deposit as payment at the POS is not built yet.
+- Product pictures are stored as small compressed images on the product (work offline, sync with the product).

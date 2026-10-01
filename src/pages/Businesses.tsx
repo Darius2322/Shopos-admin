@@ -38,7 +38,12 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
 
   const filtered = useMemo(() => {
     let rows = businesses;
-    if (filter !== 'all') rows = rows.filter((b) => b.status === filter);
+    // Soft-deleted businesses are kept in the database but hidden from normal views; they have their own filter.
+    if (filter === 'deleted') rows = rows.filter((b) => !!(b as any).deleted_at);
+    else {
+      rows = rows.filter((b) => !(b as any).deleted_at);
+      if (filter !== 'all') rows = rows.filter((b) => b.status === filter);
+    }
     if (activityFilter !== 'all') {
       rows = rows.filter((b) => {
         const age = b.last_active_at ? now - new Date(b.last_active_at).getTime() : Infinity;
@@ -64,7 +69,7 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
 
   if (loading) return <Skeleton />;
 
-  const statuses = ['all', 'pending_activation', 'active', 'paused', 'suspended'];
+  const statuses = ['all', 'pending_activation', 'active', 'paused', 'suspended', 'deleted'];
 
   return (
     <div className="space-y-3">
@@ -115,7 +120,7 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <StatusBadge status={b.status} />
+              {(b as any).deleted_at ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rust-500/15 text-rust-500">Deleted</span> : <StatusBadge status={b.status} />}
               <ChevronRight className="w-4 h-4 text-slate-500" />
             </div>
           </button>

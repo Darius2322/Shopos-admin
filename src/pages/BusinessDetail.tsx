@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ArrowLeft, KeyRound, Pause, Play, RefreshCw, ShieldOff, Star, XCircle, Lock, Trash2 } from 'lucide-react';
+import { ArrowLeft, KeyRound, Pause, Play, RefreshCw, ShieldOff, Star, XCircle, Lock, Trash2, Undo2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
 import { DurationSelect, formatExpiry } from '../components/DurationSelect';
@@ -8,18 +8,15 @@ import { Branch, Business, BusinessStatus, OtpStatusRow, Profile } from '../lib/
 import { describeError } from '../lib/errors';
 import { supabaseUrl } from '../lib/supabase';
 
-const SECTIONS = [
-  { id: 'section-overview', label: 'Overview & status' },
-  { id: 'section-usage', label: 'Usage & activity' },
-  { id: 'section-activation', label: 'Activation & access' },
-  { id: 'section-branches', label: 'Branches' },
-  { id: 'section-owner', label: 'Owner' },
-  { id: 'section-employees', label: 'Employees' },
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'users', label: 'Users' },
+  { id: 'access', label: 'Access & branches' },
+  { id: 'consent', label: 'Consent' },
+  { id: 'account', label: 'Account' },
 ] as const;
-
-function jumpTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+type TabId = (typeof TABS)[number]['id'];
 
 export default function BusinessDetail({ supabase, businessId, onBack }: { supabase: SupabaseClient; businessId: string; onBack: () => void }) {
   const [business, setBusiness] = useState<Business | null>(null);
@@ -29,6 +26,11 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   const [usage, setUsage] = useState<Record<string, number> | null>(null);
   const [activity, setActivity] = useState<{ occurred_at: string; kind: string; detail: string | null; actor_name: string | null; was_offline: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<TabId>('overview');
+  const [consents, setConsents] = useState<{ full_name: string | null; email: string | null; document_version: string; context: string; accepted_at: string; user_agent: string | null }[]>([]);
+  const [deletions, setDeletions] = useState<{ id: string; action: string; scope: string; email: string | null; reason: string | null; created_at: string }[]>([]);
+  const [restoring, setRestoring] = useState(false);
+  const [purgeMode, setPurgeMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reasonPromptFor, setReasonPromptFor] = useState<BusinessStatus | null>(null);
@@ -39,13 +41,15 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
 
   async function load() {
     setLoading(true);
-    const [biz, br, pr, otp, us, act] = await Promise.all([
+    const [biz, br, pr, otp, us, act, con, del] = await Promise.all([
       supabase.from('businesses').select('*').eq('id', businessId).single(),
       supabase.from('branches').select('*').eq('business_id', businessId).order('created_at'),
       supabase.from('profiles').select('*').eq('business_id', businessId).order('created_at'),
       supabase.rpc('admin_otp_status', { p_business_id: businessId }),
       supabase.rpc('admin_business_usage', { p_business_id: businessId }),
       supabase.rpc('admin_activity_feed', { p_business_id: businessId, p_limit: 60 }),
+      supabase.rpc('admin_business_consents', { p_business_id: businessId }),
+      supabase.from('account_deletions').select('id, action, scope, email, reason, created_at').eq('business_id', businessId).order('created_at', { ascending: false }).limit(20),
     ]);
     setBusiness(biz.data ?? null);
     setBranches(br.data ?? []);
@@ -53,6 +57,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
     setOtpHistory(otp.data ?? []);
     setUsage((us.data as Record<string, number>) ?? null);
     setActivity((act.data as any[]) ?? []);
+    setConsents((con.data as any[]) ?? []);
+    setDeletions((del.data as any[]) ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, [businessId]);
@@ -139,14 +145,26 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
       const res = await fetch(`${supabaseUrl}/functions/v1/admin-delete-business`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ businessId, confirmName: deleteConfirmName })
+        body: JSON.stringify({ businessId, confirmName: deleteConfirmName, purge: purgeMode, reason: 'Deleted by platform admin' })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Could not delete business');
-      onBack();
+      if (purgeMode) { onBack(); return; }
+      setDeleteOpen(false); setDeleteConfirmName(''); await load();
     } catch (err) {
       setDeleteError(describeError(err, 'Could not delete business'));
     } finally { setDeleting(false); }
+  }
+
+  async function restoreBusiness() {
+    setRestoring(true); setError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-restore-business`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ businessId }) });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'Could not restore business');
+      await load();
+    } catch (err) { setError(describeError(err, 'Could not restore business')); } finally { setRestoring(false); }
   }
 
   async function resetOwnerPassword() {
@@ -183,19 +201,28 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
 
       <ErrorText>{error}</ErrorText>
 
-      {/* Phone-only quick nav — this business's own sub-sections (Activation,
-          Branches, Owner, Employees) are otherwise easy to lose track of
-          once you've scrolled past them on a small screen. */}
-      <select
-        className="input text-sm lg:hidden"
-        defaultValue=""
-        onChange={(e) => { if (e.target.value) jumpTo(e.target.value); e.target.value = ''; }}
-      >
-        <option value="" disabled>Jump to section…</option>
-        {SECTIONS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-      </select>
+      {(business as any).deleted_at && (
+        <Card className="border-rust-500/40">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-rust-500">This business was deleted (soft delete)</div>
+              <div className="text-xs text-slate-400 mt-0.5">Closed {new Date((business as any).deleted_at).toLocaleString()}. All data is still held{(business as any).purge_after ? ` until ${new Date((business as any).purge_after).toLocaleDateString()}` : ''}. Sign-in is disabled for the owner and staff.</div>
+            </div>
+            <button disabled={restoring} onClick={restoreBusiness} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shrink-0"><Undo2 className="w-3.5 h-3.5" /> {restoring ? 'Restoring…' : 'Restore'}</button>
+          </div>
+        </Card>
+      )}
 
-      <Card className="section-anchor" id="section-overview">
+      <div role="tablist" aria-label="Business sections" className="flex gap-1 overflow-x-auto border-b border-slate-800 -mx-1 px-1 sticky top-0 z-10 bg-ink/95 backdrop-blur">
+        {TABS.map((t) => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
+            className={`shrink-0 px-3 min-h-[44px] text-sm border-b-2 -mb-px ${tab === t.id ? 'border-field-500 text-ink font-medium' : 'border-transparent text-slate-400 hover:text-ink'}`}>
+            {t.label}{t.id === 'consent' ? ` (${consents.length})` : t.id === 'users' ? ` (${profiles.length})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (<Card className="section-anchor" id="section-overview">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-display font-semibold text-lg">{business.name}</h2>
@@ -227,11 +254,11 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </button>
           )}
         </div>
-      </Card>
+      </Card>)}
 
       <div id="section-usage" className="section-anchor">
-        <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Usage & activity</h3>
-        <Card className="mb-2">
+        {(tab === 'overview' || tab === 'activity') && <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">{tab === 'overview' ? 'Usage' : 'Logins & activity timeline'}</h3>}
+        {(tab === 'overview' || tab === 'activity') && (<Card className="mb-2">
           <div className="grid grid-cols-2 gap-3 text-xs mb-3">
             <div><span className="text-slate-500">Last active</span><div className="text-sm font-medium">{business.last_active_at ? new Date(business.last_active_at).toLocaleString() : 'Never'}{business.last_activity_kind ? ` · ${business.last_activity_kind.replace(/_/g, ' ')}` : ''}</div></div>
             <div><span className="text-slate-500">Last sale</span><div className="text-sm font-medium">{usage?.last_sale_at ? new Date(usage.last_sale_at as unknown as string).toLocaleString() : 'None recorded'}</div></div>
@@ -260,8 +287,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
               <div className="rounded-lg bg-slate-800 p-2"><div className="tnum font-semibold">{usage.users}</div><div className="text-[10px] text-slate-400">Users</div></div>
             </div>
           ) : <p className="text-xs text-slate-500">Usage figures unavailable.</p>}
-        </Card>
-        <details open>
+        </Card>)}
+        {tab === 'activity' && (<details open>
           <summary className="text-xs text-slate-400 cursor-pointer">Activity timeline ({activity.length})</summary>
           <div className="mt-2 space-y-1.5">
             {activity.length === 0 && <p className="text-xs text-slate-500">No recorded events yet.</p>}
@@ -276,7 +303,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
               </div>
             ))}
           </div>
-        </details>
+        </details>)}
       </div>
 
       {reasonPromptFor && (
@@ -290,7 +317,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
         </Card>
       )}
 
-      <div id="section-activation" className="section-anchor">
+      {tab === 'access' && (<div id="section-activation" className="section-anchor">
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Activation & access</h3>
         <Card>
           <p className={`text-sm font-medium mb-3 ${business.activation_expires_at && new Date(business.activation_expires_at) < new Date() ? 'text-rust-500' : ''}`}>
@@ -347,9 +374,9 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </details>
           )}
         </Card>
-      </div>
+      </div>)}
 
-      <div id="section-branches" className="section-anchor">
+      {tab === 'access' && (<div id="section-branches" className="section-anchor">
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Branches ({branches.length})</h3>
         <Card className="flex items-center justify-between gap-3 mb-2">
           <div>
@@ -392,9 +419,9 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </Card>
           ))}
         </div>
-      </div>
+      </div>)}
 
-      <div id="section-owner" className="section-anchor">
+      {tab === 'users' && (<div id="section-owner" className="section-anchor">
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Owner</h3>
         {owner ? (
           <Card className="flex items-center justify-between gap-3">
@@ -410,9 +437,9 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </div>
           </Card>
         ) : <EmptyState message="No owner profile found." />}
-      </div>
+      </div>)}
 
-      <div id="section-employees" className="section-anchor">
+      {tab === 'users' && (<div id="section-employees" className="section-anchor">
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Employees ({employees.length})</h3>
         {employees.length === 0 && <EmptyState message="No employees yet." />}
         <div className="space-y-2">
@@ -426,20 +453,81 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </Card>
           ))}
         </div>
-      </div>
+      </div>)}
 
-      <div className="border-t border-rust-500/20 pt-4 mt-2">
-        <h3 className="font-display font-semibold text-sm mb-2 text-rust-500">Danger zone</h3>
-        <Card className="flex items-center justify-between gap-3 border-rust-500/30">
+      {tab === 'consent' && (
+        <div>
+          <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Data-use consent</h3>
+          <Card>
+            {consents.length === 0 ? <p className="text-sm text-slate-400">No acceptance recorded for this business yet. Accounts created before the notice was introduced appear here once their owner accepts it.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[460px]">
+                  <thead><tr className="text-slate-500 text-left"><th className="py-1.5 font-medium">Person</th><th className="font-medium">Version</th><th className="font-medium">Where</th><th className="font-medium text-right">Accepted</th></tr></thead>
+                  <tbody>
+                    {consents.map((c, i) => (
+                      <tr key={i} className="border-t border-slate-800 align-top">
+                        <td className="py-2"><div className="text-sm">{c.full_name ?? '—'}</div><div className="text-slate-500">{c.email ?? ''}</div></td>
+                        <td className="tnum">v{c.document_version}</td>
+                        <td className="capitalize">{c.context.replace(/_/g, ' ')}</td>
+                        <td className="text-right tnum">{new Date(c.accepted_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {tab === 'account' && (
+        <div className="space-y-4">
           <div>
-            <div className="text-sm font-medium">Delete this business</div>
-            <div className="text-xs text-slate-400">Permanently removes all branches, products, sales, and every account tied to it. Cannot be undone.</div>
+            <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Account</h3>
+            <Card>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div><span className="text-slate-500">Business ID</span><div className="text-sm font-mono break-all">{business.id}</div></div>
+                <div><span className="text-slate-500">Status</span><div className="text-sm"><StatusBadge status={business.status} /></div></div>
+                <div><span className="text-slate-500">Registered</span><div className="text-sm">{new Date(business.created_at).toLocaleString()}</div></div>
+                <div><span className="text-slate-500">Last updated</span><div className="text-sm">{new Date((business as any).updated_at ?? business.created_at).toLocaleString()}</div></div>
+                <div><span className="text-slate-500">Document template</span><div className="text-sm capitalize">{(business as any).document_template ?? 'classic'}</div></div>
+                <div><span className="text-slate-500">Currency</span><div className="text-sm">{business.currency}</div></div>
+              </div>
+            </Card>
           </div>
-          <button onClick={() => setDeleteOpen(true)} className="btn-secondary text-xs px-2.5 py-1 text-rust-500 flex items-center gap-1 shrink-0">
-            <Trash2 className="w-3.5 h-3.5" /> Delete
-          </button>
-        </Card>
-      </div>
+
+          <div>
+            <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Deletion history</h3>
+            <Card>
+              {deletions.length === 0 ? <p className="text-xs text-slate-500">Never deleted.</p> : deletions.map((d) => (
+                <div key={d.id} className="text-xs text-slate-400 flex justify-between gap-3 py-1.5 border-t first:border-t-0 border-slate-800">
+                  <span className="capitalize">{d.action.replace(/_/g, ' ')} · {d.scope}{d.email ? ` · ${d.email}` : ''}{d.reason ? ` · ${d.reason}` : ''}</span>
+                  <span className="shrink-0 tnum">{new Date(d.created_at).toLocaleString()}</span>
+                </div>
+              ))}
+            </Card>
+          </div>
+
+          <div className="border-t border-rust-500/20 pt-4">
+            <h3 className="font-display font-semibold text-sm mb-2 text-rust-500">Danger zone</h3>
+            {(business as any).deleted_at ? (
+              <Card className="space-y-3 border-rust-500/30">
+                <div className="text-sm font-medium">Permanently erase</div>
+                <div className="text-xs text-slate-400">Removes every record and account for good. Only available because this business is already deleted. Cannot be undone.</div>
+                <button onClick={() => { setPurgeMode(true); setDeleteOpen(true); }} className="btn-secondary text-xs px-2.5 py-1 text-rust-500 flex items-center gap-1 w-fit"><Trash2 className="w-3.5 h-3.5" /> Permanently erase…</button>
+              </Card>
+            ) : (
+              <Card className="flex items-center justify-between gap-3 border-rust-500/30">
+                <div>
+                  <div className="text-sm font-medium">Delete this business</div>
+                  <div className="text-xs text-slate-400">Soft delete: closes access for the owner and all staff immediately. Nothing is erased, and it can be restored for 30 days.</div>
+                </div>
+                <button onClick={() => { setPurgeMode(false); setDeleteOpen(true); }} className="btn-secondary text-xs px-2.5 py-1 text-rust-500 flex items-center gap-1 shrink-0"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
 
       {resetPasswordOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -474,10 +562,11 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => { setDeleteOpen(false); setDeleteConfirmName(''); setDeleteError(null); }} />
           <div className="relative card p-5 max-w-sm w-full border-rust-500/30">
-            <h3 className="font-display font-semibold text-lg mb-1 text-rust-500">Delete {business.name}</h3>
+            <h3 className="font-display font-semibold text-lg mb-1 text-rust-500">{purgeMode ? 'Permanently erase' : 'Delete'} {business.name}</h3>
             <p className="text-xs text-slate-400 mb-3">
-              This permanently removes every branch, product, sale, customer, and financial record for this business,
-              plus the owner's and every employee's account. There is no undo. Type the business name to confirm.
+              {purgeMode
+                ? "This permanently removes every branch, product, sale, customer, and financial record for this business, plus the owner's and every employee's account. There is no undo. Type the business name to confirm."
+                : "This closes the business and everyone's sign-in straight away. No data is erased and you can restore it later. Type the business name to confirm."}
             </p>
             <input
               className="input mb-3" type="text" placeholder={business.name}
@@ -490,7 +579,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
                 disabled={deleting || deleteConfirmName.trim().toLowerCase() !== business.name.trim().toLowerCase()}
                 className="btn-primary flex-1 !bg-rust-500 hover:!bg-rust-500"
               >
-                {deleting ? 'Deleting…' : 'Permanently delete'}
+                {deleting ? 'Working…' : purgeMode ? 'Permanently erase' : 'Delete (soft)'}
               </button>
               <button onClick={() => { setDeleteOpen(false); setDeleteConfirmName(''); setDeleteError(null); }} className="btn-secondary flex-1">Cancel</button>
             </div>
