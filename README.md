@@ -75,3 +75,21 @@ CHANGED: dashboard shortcuts (3 groups + clickable Recent sales / Low stock / Ow
 - `/r/` receipt links now use the new public page (the old `PublicReceipt` is no longer routed).
 - Dashboard.tsx wasn't available: shortcuts and clickable records are added above it via AppShell. If you send Dashboard.tsx I can make its own tiles clickable and remove duplicates.
 - Deposits and Previous Days need a connection.
+
+
+---
+# Round 5
+
+## Fixed in Supabase (live)
+- **Deposit error ("Couldn't load the deposit balance")**: the new tables had no SELECT grant for signed-in users. Granted (row-level security still limits everyone to their own business) on customer_deposits, account_consents, account_deletions, consent_documents, document_shares, client_activity_events. Retested: deposit saved, row visible, balance 100.
+- ShopOS slogan set to "Run Your Business Smarter" (the wording in your app's title). Change anytime: `update platform_settings set slogan = '...' where id = 'default';`
+
+## App
+- Dashboard shortcut buttons + records now sit AFTER the dashboard content (bottom).
+- Bottom bar: Debts replaced by Inventory (Home, POS, Customers, Inventory).
+- Inventory split into tabs: Products | Overview | Categories | Stock history. Categories tab: tap a category (or the + button) to add existing products to it or create a new product inside it.
+- Documents/receipts/quotes/invoices and the customer link page now show the real ShopOS emblem (/logo-emblem.png) + slogan + contact.
+- NEW Business Reports (More > Documents > Business Reports): Profit & loss, Sales summary, Expenses, Top customers, Low & out of stock, Expired & expiring, Whole store stock, Debts owed. Time frames: today, yesterday, this/last week, this/last month, this year, custom. Print/PDF, share as picture, CSV. Profit and stock-value reports need cost access.
+- Debt page: "Register as customer" for people who owe but aren't customers (also offers "Link to <customer>" when the same phone exists) and links their other unlinked debts.
+- Customer page: Call and WhatsApp are now round icons beside the name, same as the debt page.
+- DMN Solutions link now https://www.dmnsolutions.co.ke in PublicLayout.tsx. Search your repo for `dmn-solutions.vercel.app`: `usePlatformContact.ts` (which I could not see) defines DMN_URL and may be used elsewhere.
