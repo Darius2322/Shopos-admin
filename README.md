@@ -93,3 +93,15 @@ CHANGED: dashboard shortcuts (3 groups + clickable Recent sales / Low stock / Ow
 - Debt page: "Register as customer" for people who owe but aren't customers (also offers "Link to <customer>" when the same phone exists) and links their other unlinked debts.
 - Customer page: Call and WhatsApp are now round icons beside the name, same as the debt page.
 - DMN Solutions link now https://www.dmnsolutions.co.ke in PublicLayout.tsx. Search your repo for `dmn-solutions.vercel.app`: `usePlatformContact.ts` (which I could not see) defines DMN_URL and may be used elsewhere.
+
+## Round: reports, barcode, end of day, suppliers, notifications, updates
+
+Already live in Supabase (nothing to run): last-active triggers and backfill, 11:59 pm auto end-of-day (pg_cron, Nairobi time), hourly notification generator, release notifications, `barcode_cache`, edge functions `lookup-product` v2 and `github-latest-release`.
+
+App files: `lib/reports.ts` (9 new reports), `features/closing/EndOfDayHub.tsx` (Close today / Calendar / Previous days), `features/suppliers/SupplierListPage.tsx` + `SupplierDetailPage.tsx` (old screen kept at `/suppliers/manage`), `lib/supplierImport.ts` + `features/inventory/SupplierImportSheet.tsx` (CSV/TSV only), `components/layout/NotificationsBell.tsx`, `lib/notificationFeed.ts`, `features/notifications/NotificationsPage.tsx`, `components/layout/MobileBranchChip.tsx`, `components/ShareShopos.tsx`, `components/motion/Motion.tsx` + motion CSS in `index.css`, `vite.config.ts` (build id + version.json), `lib/updates.ts`, `lib/pwaUpdate.ts`, `vite-env.d.ts`.
+Admin: `pages/AppReleases.tsx` has the "Publish from GitHub" card.
+
+To finish by hand: put `<ReviewForm />` in the landing review section (the page was not visible to me); optional secret `GITHUB_TOKEN` in Supabase if a repo is private; set the admin repo name in the GitHub card if it is not `Darius2322/shopos-admin`.
+
+## Desktop setups
+- Dashboard → "Desktop setups": approve (7/14/30/90 days) or reject shops' requests for the desktop setup file, revoke an approval, and publish installers (uploads to the private desktop-installers bucket with a SHA-256 checksum). Enforced in the database by is_platform_admin().

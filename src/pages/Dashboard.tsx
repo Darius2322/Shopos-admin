@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card, Skeleton, StatCard, StatusBadge } from '../components/ui';
 import { Business } from '../lib/types';
+import { DesktopSetups } from '../components/DesktopSetups';
 
 interface DayRow { day: string; transactions: number; sales_amount: number; active_businesses: number }
 interface TopShop { business_id: string; name: string; status: string; transactions: number; sales_amount: number; avg_sale: number; growth_pct: number | null; last_sale_at: string | null; active_days: number }
@@ -195,6 +196,8 @@ export default function Dashboard({ supabase, onOpenBusiness }: { supabase: Supa
           </>
         )}
       </div>
+
+      <DesktopSetups supabase={supabase} />
 
       <div>
         <h2 className="font-display font-semibold text-lg mb-3">System</h2>
