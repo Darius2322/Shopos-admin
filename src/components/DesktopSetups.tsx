@@ -40,6 +40,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
   const [pubNotes, setPubNotes] = useState('');
   const [pubCurrent, setPubCurrent] = useState(true);
   const [dlMsg, setDlMsg] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [pubVersion, setPubVersion] = useState('');
   const [pubFile, setPubFile] = useState<File | null>(null);
   const [pubMsg, setPubMsg] = useState<string | null>(null);
@@ -52,6 +53,10 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
     if (r.error) { setError(r.error.message); setRows([]); return; }
     setRows(((r.data ?? []) as unknown as (Omit<Row, 'businesses'> & { businesses: { name: string } | { name: string }[] | null })[]).map((x) => ({ ...x, businesses: Array.isArray(x.businesses) ? x.businesses[0] ?? null : x.businesses })));
     setRels((l.data ?? []) as Rel[]);
+    const dl = await supabase.from('desktop_downloads').select('platform, arch, version').order('created_at', { ascending: false }).limit(5000);
+    const c: Record<string, number> = {};
+    for (const d of (dl.data ?? []) as { platform: string; arch: string | null; version: string | null }[]) { const k = `${d.platform}|${d.arch}|${d.version}`; c[k] = (c[k] ?? 0) + 1; }
+    setCounts(c);
   }, [supabase]);
   useEffect(() => { void load(); }, [load]);
 
@@ -160,7 +165,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
 
       <Card className="space-y-3">
         <div className="text-sm font-medium flex items-center gap-2"><HardDrive className="w-4 h-4" /> Installer library</div>
-        <p className="text-xs text-slate-400">Every version you upload is kept here. The one marked <b>Current</b> is what approved shops download. When you update the app, upload the new build, then make it current. You can go back to an older version at any time. Download any file to put on a USB stick and install on tills without internet.</p>
+        <p className="text-xs text-slate-400">Every version you upload is kept here. The one marked <b>Current</b> is what shop owners download from More → Desktop app, with no request or approval needed. Builds from GitHub appear here by themselves. When you update the app, upload the new build, then make it current. You can go back to an older version at any time. Download any file to put on a USB stick and install on tills without internet.</p>
         {dlMsg && <p className="text-xs text-slate-300 break-all">{dlMsg}</p>}
         {(['windows', 'mac', 'linux'] as Platform[]).map((p) => {
           const list = rels.filter((x) => x.platform === p);
@@ -174,7 +179,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-sm">v{x.version} · {archLabel(p, x.arch)} {x.is_current && <span className="ml-1 text-[10px] bg-field-600 text-white rounded-full px-1.5 py-0.5 align-middle">Current</span>}{!x.published && <span className="ml-1 text-[10px] bg-slate-600 text-slate-200 rounded-full px-1.5 py-0.5 align-middle">Pulled</span>}</div>
-                        <div className="text-slate-400 break-all">{x.file_name}{x.size_bytes ? ` · ${mb(x.size_bytes)}` : ''} · {day(x.created_at)}</div>
+                        <div className="text-slate-400 break-all">{x.file_name}{x.size_bytes ? ` · ${mb(x.size_bytes)}` : ''} · {day(x.created_at)} · {counts[`${x.platform}|${x.arch}|${x.version}`] ?? 0} downloads</div>
                         {x.notes && <div className="text-slate-400 mt-0.5">{x.notes}</div>}
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -195,7 +200,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
 
       <Card className="space-y-3 mt-3">
         <div className="text-sm font-medium">Add a new installer or update</div>
-        <p className="text-xs text-slate-400">Build the files in GitHub → Actions → “Build desktop installers”, download them, then upload each one here. Add one per computer type and chip. Only approved shops can download them, through a private two-minute link.</p>
+        <p className="text-xs text-slate-400">Normally you do not need this: running GitHub → Actions → “Build desktop installers” publishes every installer here automatically. Use this form only to add a file by hand (for example a build you made elsewhere). Owners download through a private two-minute link.</p>
         <div className="grid grid-cols-2 gap-2">
           <select value={pubPlatform} onChange={(e) => { const p = e.target.value as Platform; setPubPlatform(p); setPubArch(ARCHES[p][0].id); }} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{(['windows', 'mac', 'linux'] as Platform[]).map((p) => <option key={p} value={p}>{LABEL[p]} ({EXT[p].join(' / ')})</option>)}</select>
           <select value={pubArch} onChange={(e) => setPubArch(e.target.value as Arch)} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{ARCHES[pubPlatform].map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}</select>

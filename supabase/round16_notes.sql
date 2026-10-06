@@ -1,0 +1,7 @@
+-- Round 16: already applied live to project frhhldkotckfexsegtjx via two migrations. Listed here for the record only.
+-- round16_business_type_numbering_branding: businesses.business_type / number_formats / receipt_settings, format_document_number(),
+--   reserve_document_numbers_v2(), next_document_number_v2(), guard_business_branding trigger, bucket business-logos + policies.
+-- round16_site_analytics_and_installer_ingest: site_visits, ci_ingest_tokens, desktop_downloads,
+--   admin_site_overview/timeseries/breakdown/hourly/recent/funnel, admin_business_types.
+-- Edge functions: desktop-setup-link v3, desktop-ingest v1, track v1.
+-- Revoke the GitHub build token any time:  update ci_ingest_tokens set revoked_at = now() where label = 'GitHub desktop build';

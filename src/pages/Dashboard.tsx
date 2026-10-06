@@ -4,6 +4,7 @@ import { Card, Skeleton, StatCard, StatusBadge } from '../components/ui';
 import { Business } from '../lib/types';
 import { DesktopSetups } from '../components/DesktopSetups';
 import { ReconsiderDecisions } from '../components/ReconsiderDecisions';
+import { SiteAnalytics } from '../components/SiteAnalytics';
 
 interface DayRow { day: string; transactions: number; sales_amount: number; active_businesses: number }
 interface TopShop { business_id: string; name: string; status: string; transactions: number; sales_amount: number; avg_sale: number; growth_pct: number | null; last_sale_at: string | null; active_days: number }
@@ -115,6 +116,8 @@ export default function Dashboard({ supabase, onOpenBusiness }: { supabase: Supa
           <StatCard label="Suspended" value={counts.businessesByStatus.suspended ?? 0} />
         </div>
       </div>
+
+      <SiteAnalytics supabase={supabase} />
 
       <div>
         <h2 className="font-display font-semibold text-lg mb-3">Activity</h2>

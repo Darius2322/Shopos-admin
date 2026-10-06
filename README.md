@@ -111,3 +111,9 @@ To finish by hand: put `<ReviewForm />` in the landing review section (the page 
 - **Closed requests**: a rejected or revoked desktop request can be approved instead, or sent back to waiting, with one tap.
 - **Changed your mind?**: rejected registrations (and "more information" ones that were not claimed) and rejected feature requests can be reopened; then approve them the usual way.
 - Supabase (applied live; copy in `supabase/round14_installers_and_reversals.sql`): `desktop_releases` gains arch, notes, is_current; functions `admin_set_current_desktop_release`, `admin_unpublish_desktop_release`, `admin_reopen_owner_request`, `admin_reopen_feature_request`; `admin_decide_desktop_request` now allows approve / reopen after a rejection. Edge function `desktop-setup-link` v2 serves the current version for the chosen chip.
+
+---
+# Round 16 (admin)
+- `src/components/SiteAnalytics.tsx` (Dashboard, under Platform overview): live visitors, visitors / visits / page views with change vs the previous period, new vs returning, pages per visit, time on site, bounce rate, traffic chart, visit-to-sign-in funnel, busiest hours, top pages, countries, cities, sources, devices, OS, browsers, languages, actions, businesses by type, latest activity, CSV export.
+- `src/components/DesktopSetups.tsx`: owners download without requests; builds from GitHub appear by themselves; download counts per version.
+- Database objects are already live (see app README Round 16). `supabase/round16_notes.sql` lists them.
