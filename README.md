@@ -105,3 +105,9 @@ To finish by hand: put `<ReviewForm />` in the landing review section (the page 
 
 ## Desktop setups
 - Dashboard → "Desktop setups": approve (7/14/30/90 days) or reject shops' requests for the desktop setup file, revoke an approval, and publish installers (uploads to the private desktop-installers bucket with a SHA-256 checksum). Enforced in the database by is_platform_admin().
+
+## Round 15 — Installer library and reversible decisions
+- Dashboard → **Installer library**: every uploaded version is kept per computer type and chip (Windows 64/32-bit/ARM, Mac, Linux). Mark any version **Current** (what approved shops download), go back to an older one, **Pull** a bad one, copy its checksum, and **Download** any file (private one-hour link, admins only) to put on a USB stick for tills without internet. "Add a new installer or update" uploads a new build with notes.
+- **Closed requests**: a rejected or revoked desktop request can be approved instead, or sent back to waiting, with one tap.
+- **Changed your mind?**: rejected registrations (and "more information" ones that were not claimed) and rejected feature requests can be reopened; then approve them the usual way.
+- Supabase (applied live; copy in `supabase/round14_installers_and_reversals.sql`): `desktop_releases` gains arch, notes, is_current; functions `admin_set_current_desktop_release`, `admin_unpublish_desktop_release`, `admin_reopen_owner_request`, `admin_reopen_feature_request`; `admin_decide_desktop_request` now allows approve / reopen after a rejection. Edge function `desktop-setup-link` v2 serves the current version for the chosen chip.
