@@ -1,10 +1,11 @@
-import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Plus, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Plus, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, HardDrive } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'analytics' | 'installers' | 'monitor';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
   ['requests', 'Owner Requests', Users],
+  ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
   ['create', 'New Business', Plus],
   ['branches', 'Branches', Store],
@@ -12,6 +13,8 @@ export const TABS: [Tab, string, any][] = [
   ['reviews', 'Reviews', Star],
   ['permissions', 'Role Defaults', ShieldCheck],
   ['releases', 'App Updates', RefreshCw],
+  ['installers', 'Installers', HardDrive],
+  ['monitor', 'Monitor', Terminal],
   ['audit', 'Audit Logs', ScrollText],
   ['support', 'Support', LifeBuoy],
   ['settings', 'Platform Settings', Settings],

@@ -20,6 +20,10 @@ import PlatformSettingsPage from './pages/PlatformSettings';
 import RoleDefaultsPage from './pages/RoleDefaults';
 import Reviews from './pages/Reviews';
 import AppReleases from './pages/AppReleases';
+import Analytics from './pages/Analytics';
+import Installers from './pages/Installers';
+import Monitor from './pages/Monitor';
+import { friendlyError } from './lib/friendlyError';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -81,7 +85,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
       if (error) throw error;
       if (data.user) onSignedIn(data.user.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed');
+      setError(friendlyError(err, 'Sign in failed. Please try again.'));
     } finally { setBusy(false); }
   }
 
@@ -108,7 +112,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -157,8 +161,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
         </header>
 
         <main className="flex-1 overflow-y-auto p-5">
-          <div className="max-w-3xl mx-auto">
-            {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} />}
+          <div className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-4xl' : 'max-w-3xl'}`}>
+            {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />}
             {tab === 'requests' && <OwnerRequests supabase={supabase} />}
             {tab === 'businesses' && (
               openBusinessId
@@ -174,6 +178,9 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
             {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
             {tab === 'releases' && <AppReleases supabase={supabase} />}
+            {tab === 'analytics' && <Analytics supabase={supabase} />}
+            {tab === 'installers' && <Installers supabase={supabase} />}
+            {tab === 'monitor' && <Monitor supabase={supabase} />}
           </div>
         </main>
       </div>

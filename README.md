@@ -1,3 +1,20 @@
+# ShopOS admin — Round 17
+
+## New menus
+- **Analytics**: the full visitor report on its own page. The Dashboard keeps a small *Visitors* summary with a "Full analytics" link.
+- **Installers**: everything about desktop setup files in one place: what owners can download now, how to fill the library, the library itself, manual upload, and NEW "Link an installer hosted elsewhere" (https link, for files bigger than Supabase's 50 MB upload limit). The old Dashboard section moved here.
+- **Monitor**: a read-only terminal. Commands: `health`, `stats [minutes]`, `tail [n] [level]`, `errors`, `security`, `watch [level]` (live), `stop`, `clear`, `help`. It reads only through admin-checked database functions; nothing can change data.
+
+## Friendly errors
+- NEW `lib/friendlyError.ts`; `lib/errors.ts` (`describeError`) now returns friendly text, so every page that already used it is covered. Sign-in, installers, releases, analytics and decisions screens updated.
+
+## Files
+NEW `pages/Analytics.tsx`, `pages/Installers.tsx`, `pages/Monitor.tsx`, `components/AnalyticsSummary.tsx`, `lib/friendlyError.ts`. CHANGED `App.tsx`, `components/Sidebar.tsx` (full files, based on the last copy I had: compare before overwriting if you edited them), `pages/Dashboard.tsx`, `components/DesktopSetups.tsx`, `lib/errors.ts` (replaces the old one; it only exported `describeError` in the copy I saw), `AppReleases.tsx`, `ReconsiderDecisions.tsx`, `SiteAnalytics.tsx`.
+
+## Database / backend (already live)
+See `supabase/round17_notes.sql`.
+
+---
 # ShopOS – this round (drop-in files, same paths under `src/`)
 
 Database (already applied live to project ShopOs via migrations phase30–32):

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from './ui';
+import { friendlyError } from '../lib/friendlyError';
 import { Download, Loader2, RefreshCw } from 'lucide-react';
 
 interface Overview {
@@ -121,7 +122,7 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
         ...BREAKDOWNS.map((x) => supabase.rpc('admin_site_breakdown', { p_days: days, p_dim: x.dim, p_limit: 10 }))
       ]);
       const firstErr = [o, s, h, f, r, t, ...b].find((x) => x.error);
-      if (firstErr?.error) { setError(firstErr.error.message); return; }
+      if (firstErr?.error) { setError(friendlyError(firstErr.error, "Couldn't load visitor figures.")); return; }
       const raw = o.data as Overview;
       setOv(Object.fromEntries(Object.entries(raw ?? {}).map(([k, v]) => [k, v == null ? null : Number(v)])) as unknown as Overview);
       setSeries(((s.data ?? []) as Point[]).map((p) => ({ bucket: p.bucket, visitors: n(p.visitors), sessions: n(p.sessions), pageviews: n(p.pageviews) })));

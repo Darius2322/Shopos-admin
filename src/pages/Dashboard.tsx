@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card, Skeleton, StatCard, StatusBadge } from '../components/ui';
 import { Business } from '../lib/types';
-import { DesktopSetups } from '../components/DesktopSetups';
 import { ReconsiderDecisions } from '../components/ReconsiderDecisions';
-import { SiteAnalytics } from '../components/SiteAnalytics';
+import { AnalyticsSummary } from '../components/AnalyticsSummary';
 
 interface DayRow { day: string; transactions: number; sales_amount: number; active_businesses: number }
 interface TopShop { business_id: string; name: string; status: string; transactions: number; sales_amount: number; avg_sale: number; growth_pct: number | null; last_sale_at: string | null; active_days: number }
@@ -27,7 +26,7 @@ interface Counts {
   pendingReleases: number;
 }
 
-export default function Dashboard({ supabase, onOpenBusiness }: { supabase: SupabaseClient; onOpenBusiness: (id: string) => void }) {
+export default function Dashboard({ supabase, onOpenBusiness, onGo }: { supabase: SupabaseClient; onOpenBusiness: (id: string) => void; onGo?: (tab: 'analytics' | 'installers' | 'monitor') => void }) {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [recent, setRecent] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +116,7 @@ export default function Dashboard({ supabase, onOpenBusiness }: { supabase: Supa
         </div>
       </div>
 
-      <SiteAnalytics supabase={supabase} />
+      <AnalyticsSummary supabase={supabase} onGo={onGo ? () => onGo('analytics') : undefined} />
 
       <div>
         <h2 className="font-display font-semibold text-lg mb-3">Activity</h2>
@@ -201,7 +200,6 @@ export default function Dashboard({ supabase, onOpenBusiness }: { supabase: Supa
         )}
       </div>
 
-      <DesktopSetups supabase={supabase} />
       <ReconsiderDecisions supabase={supabase} />
 
       <div>

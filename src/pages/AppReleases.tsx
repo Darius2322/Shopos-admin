@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Plus, X, Pencil, Trash2, Eye, EyeOff, GitBranch, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
+import { friendlyError } from '../lib/friendlyError';
 
 interface Release {
   id: string;
@@ -40,7 +41,7 @@ export default function AppReleases({ supabase }: { supabase: SupabaseClient }) 
 
   async function load() {
     const { data, error } = await supabase.from('app_releases').select('*').order('target_app').order('release_date', { ascending: false });
-    if (error) setError(error.message);
+    if (error) setError(friendlyError(error));
     else setReleases(data as Release[]);
   }
   useEffect(() => { load(); }, []);
@@ -48,14 +49,14 @@ export default function AppReleases({ supabase }: { supabase: SupabaseClient }) 
   async function togglePublished(r: Release) {
     setError(null);
     const { error } = await supabase.from('app_releases').update({ published: !r.published, updated_at: new Date().toISOString() }).eq('id', r.id);
-    if (error) setError(error.message); else load();
+    if (error) setError(friendlyError(error)); else load();
   }
 
   async function remove(r: Release) {
     if (!confirm(`Delete release ${r.version} (${TARGET_LABEL[r.target_app]})? This can't be undone.`)) return;
     setError(null);
     const { error } = await supabase.from('app_releases').delete().eq('id', r.id);
-    if (error) setError(error.message); else load();
+    if (error) setError(friendlyError(error)); else load();
   }
 
   const shown = releases?.filter((r) => filter === 'all' || r.target_app === filter) ?? [];
@@ -157,7 +158,7 @@ function ReleaseModal({ supabase, release, prefill, onClose, onSaved }: { supaba
       if (error) throw error;
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save release');
+      setError(friendlyError(err, 'Could not save release'));
     } finally { setSaving(false); }
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from './ui';
+import { friendlyError } from '../lib/friendlyError';
 import { RotateCcw, Loader2 } from 'lucide-react';
 
 interface Owner { id: string; full_name: string; business_name: string; status: string; decision_reason: string | null; decided_at: string | null; claimed_at: string | null }
@@ -21,7 +22,7 @@ export function ReconsiderDecisions({ supabase }: { supabase: SupabaseClient }) 
       supabase.from('owner_requests').select('id, full_name, business_name, status, decision_reason, decided_at, claimed_at').in('status', ['rejected', 'info_requested']).is('claimed_at', null).order('decided_at', { ascending: false }).limit(15),
       supabase.from('feature_requests').select('id, feature, admin_reason, decided_at, businesses(name)').eq('status', 'rejected').order('decided_at', { ascending: false }).limit(15)
     ]);
-    if (o.error) setError(o.error.message);
+    if (o.error) setError(friendlyError(o.error));
     setOwners((o.data ?? []) as Owner[]);
     setFeatures(((f.data ?? []) as unknown as (Omit<Feature, 'businesses'> & { businesses: { name: string } | { name: string }[] | null })[]).map((x) => ({ ...x, businesses: Array.isArray(x.businesses) ? x.businesses[0] ?? null : x.businesses })));
   }, [supabase]);
@@ -31,7 +32,7 @@ export function ReconsiderDecisions({ supabase }: { supabase: SupabaseClient }) 
     setBusy(id); setError(null); setMsg(null);
     const { error: e } = await supabase.rpc(kind === 'owner' ? 'admin_reopen_owner_request' : 'admin_reopen_feature_request', { p_request_id: id });
     setBusy(null);
-    if (e) { setError(e.message); return; }
+    if (e) { setError(friendlyError(e)); return; }
     setMsg(kind === 'owner' ? 'Application moved back to waiting. Approve it from your applications list.' : 'Request moved back to waiting. Decide it from your requests list.');
     await load();
   }

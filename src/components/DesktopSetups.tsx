@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from './ui';
+import { friendlyError } from '../lib/friendlyError';
 import { Check, X, Ban, Upload, Loader2, Download, Star, EyeOff, Copy, RotateCcw, HardDrive } from 'lucide-react';
 
 type Platform = 'windows' | 'mac' | 'linux';
 interface Row { id: string; business_id: string; platform: Platform; status: 'pending' | 'approved' | 'rejected' | 'revoked'; reason: string | null; admin_reason: string | null; expires_at: string | null; download_count: number; last_download_at: string | null; created_at: string; businesses: { name: string } | null }
 type Arch = 'x64' | 'ia32' | 'arm64' | 'universal';
-interface Rel { id: string; platform: Platform; arch: Arch; version: string; file_name: string; file_path: string; size_bytes: number | null; sha256: string | null; notes: string | null; created_at: string; published: boolean; is_current: boolean }
+interface Rel { id: string; platform: Platform; arch: Arch; version: string; file_name: string; file_path: string; external_url?: string | null; size_bytes: number | null; sha256: string | null; notes: string | null; created_at: string; published: boolean; is_current: boolean }
 const ARCHES: Record<Platform, { id: Arch; label: string }[]> = {
   windows: [{ id: 'x64', label: '64-bit (most tills)' }, { id: 'ia32', label: '32-bit (older tills)' }, { id: 'arm64', label: 'ARM' }],
   mac: [{ id: 'universal', label: 'Intel + Apple chip' }, { id: 'x64', label: 'Intel only' }, { id: 'arm64', label: 'Apple chip only' }],
@@ -25,7 +26,7 @@ async function sha256(file: File) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Dashboard section: approve or reject shops' requests for the desktop setup file, and publish new installers.
+/** Installers menu section: approve or reject shops' requests for the desktop setup file, and publish new installers.
  * Only platform admins can do either (enforced by the database, not just this screen). */
 export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -48,9 +49,9 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
   const load = useCallback(async () => {
     const [r, l] = await Promise.all([
       supabase.from('desktop_setup_requests').select('id, business_id, platform, status, reason, admin_reason, expires_at, download_count, last_download_at, created_at, businesses(name)').order('created_at', { ascending: false }).limit(60),
-      supabase.from('desktop_releases').select('id, platform, arch, version, file_name, file_path, size_bytes, sha256, notes, created_at, published, is_current').order('created_at', { ascending: false }).limit(80)
+      supabase.from('desktop_releases').select('id, platform, arch, version, file_name, file_path, external_url, size_bytes, sha256, notes, created_at, published, is_current').order('created_at', { ascending: false }).limit(80)
     ]);
-    if (r.error) { setError(r.error.message); setRows([]); return; }
+    if (r.error) { setError(friendlyError(r.error)); setRows([]); return; }
     setRows(((r.data ?? []) as unknown as (Omit<Row, 'businesses'> & { businesses: { name: string } | { name: string }[] | null })[]).map((x) => ({ ...x, businesses: Array.isArray(x.businesses) ? x.businesses[0] ?? null : x.businesses })));
     setRels((l.data ?? []) as Rel[]);
     const dl = await supabase.from('desktop_downloads').select('platform, arch, version').order('created_at', { ascending: false }).limit(5000);
@@ -64,7 +65,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
     setBusy(id); setError(null);
     const { error: e } = await supabase.rpc('admin_decide_desktop_request', { p_request_id: id, p_decision: decision, p_reason: why?.trim() || null, p_valid_days: days });
     setBusy(null);
-    if (e) { setError(e.message); return; }
+    if (e) { setError(friendlyError(e)); return; }
     setReasonFor(null); setReason(''); await load();
   }
 
@@ -78,23 +79,24 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
       const version = pubVersion.trim().replace(/^v/i, '');
       const path = `${pubPlatform}/${pubArch}/${clean(version)}/${clean(pubFile.name)}`;
       const up = await supabase.storage.from('desktop-installers').upload(path, pubFile, { upsert: true, contentType: 'application/octet-stream' });
-      if (up.error) { setPubMsg(/size|large|exceed/i.test(up.error.message) ? `The file is larger than your Supabase storage upload limit (${up.error.message}). Raise it in Supabase → Storage → Settings, or use a smaller build.` : up.error.message); return; }
+      if (up.error) { setPubMsg(/size|large|exceed|413/i.test(up.error.message) ? 'This file is larger than your Supabase storage upload limit (50 MB on the free plan). Use "Link an installer hosted elsewhere" on the Installers page instead, for example a GitHub download link.' : friendlyError(up.error, 'Could not upload the file.')); return; }
       const ins = await supabase.from('desktop_releases').upsert({ platform: pubPlatform, arch: pubArch, version, file_path: path, file_name: clean(pubFile.name), size_bytes: pubFile.size, sha256: hash, notes: pubNotes.trim() || null, published: true }, { onConflict: 'platform,arch,version' }).select('id').single();
-      if (ins.error || !ins.data) { setPubMsg(ins.error?.message ?? 'Could not save the version.'); return; }
-      if (pubCurrent) { const cur = await supabase.rpc('admin_set_current_desktop_release', { p_id: ins.data.id }); if (cur.error) { setPubMsg(`Saved, but could not make it current: ${cur.error.message}`); await load(); return; } }
+      if (ins.error || !ins.data) { setPubMsg(friendlyError(ins.error, 'Could not save the version.')); return; }
+      if (pubCurrent) { const cur = await supabase.rpc('admin_set_current_desktop_release', { p_id: ins.data.id }); if (cur.error) { setPubMsg(`Saved, but could not make it current: ${friendlyError(cur.error)}`); await load(); return; } }
       setPubMsg(`Saved ${LABEL[pubPlatform]} ${archLabel(pubPlatform, pubArch)} version ${version}${pubCurrent ? ' and made it the current one' : ''}. Checksum ${hash.slice(0, 12)}…`); setPubFile(null); setPubNotes(''); await load();
-    } catch (e) { setPubMsg(e instanceof Error ? e.message : 'Upload failed.'); } finally { setBusy(null); }
+    } catch (e) { setPubMsg(friendlyError(e, 'Upload failed.')); } finally { setBusy(null); }
   }
 
-  async function makeCurrent(id: string) { setBusy(`cur-${id}`); setError(null); const { error: e } = await supabase.rpc('admin_set_current_desktop_release', { p_id: id }); setBusy(null); if (e) setError(e.message); else await load(); }
-  async function pull(id: string) { setBusy(`pull-${id}`); setError(null); const { error: e } = await supabase.rpc('admin_unpublish_desktop_release', { p_id: id }); setBusy(null); if (e) setError(e.message); else await load(); }
+  async function makeCurrent(id: string) { setBusy(`cur-${id}`); setError(null); const { error: e } = await supabase.rpc('admin_set_current_desktop_release', { p_id: id }); setBusy(null); if (e) setError(friendlyError(e)); else await load(); }
+  async function pull(id: string) { setBusy(`pull-${id}`); setError(null); const { error: e } = await supabase.rpc('admin_unpublish_desktop_release', { p_id: id }); setBusy(null); if (e) setError(friendlyError(e)); else await load(); }
 
   /** Admin download (for a USB stick). The link works for one hour and only for platform admins. */
   async function adminDownload(x: Rel) {
+    if (x.external_url) { setDlMsg(`Opening the download link for ${x.file_name}${x.sha256 ? `. SHA-256: ${x.sha256}` : ''}`); window.open(x.external_url, '_blank', 'noopener,noreferrer'); return; }
     setBusy(`dl-${x.id}`); setDlMsg(null);
     const { data, error: e } = await supabase.storage.from('desktop-installers').createSignedUrl(x.file_path, 3600, { download: x.file_name });
     setBusy(null);
-    if (e || !data?.signedUrl) { setDlMsg(e?.message ?? 'Could not prepare the download.'); return; }
+    if (e || !data?.signedUrl) { setDlMsg(friendlyError(e, 'Could not prepare the download.')); return; }
     setDlMsg(`Downloading ${x.file_name}${x.sha256 ? `. SHA-256: ${x.sha256}` : ''}`);
     window.location.href = data.signedUrl;
   }
@@ -179,7 +181,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-sm">v{x.version} · {archLabel(p, x.arch)} {x.is_current && <span className="ml-1 text-[10px] bg-field-600 text-white rounded-full px-1.5 py-0.5 align-middle">Current</span>}{!x.published && <span className="ml-1 text-[10px] bg-slate-600 text-slate-200 rounded-full px-1.5 py-0.5 align-middle">Pulled</span>}</div>
-                        <div className="text-slate-400 break-all">{x.file_name}{x.size_bytes ? ` · ${mb(x.size_bytes)}` : ''} · {day(x.created_at)} · {counts[`${x.platform}|${x.arch}|${x.version}`] ?? 0} downloads</div>
+                        <div className="text-slate-400 break-all">{x.file_name}{x.external_url ? ' · linked' : ''}{x.size_bytes ? ` · ${mb(x.size_bytes)}` : ''} · {day(x.created_at)} · {counts[`${x.platform}|${x.arch}|${x.version}`] ?? 0} downloads</div>
                         {x.notes && <div className="text-slate-400 mt-0.5">{x.notes}</div>}
                       </div>
                       <div className="flex gap-1 shrink-0">

@@ -1,0 +1,12 @@
+-- Round 17 — applied live to project frhhldkotckfexsegtjx (migrations: round17_rate_limits_and_monitor, round17_lock_down_rpcs, round17_external_installer_links). Notes only.
+-- Rate limiting: table rate_limits(key,win,scope,n,lim); rl_check(scope, limit, window_seconds, key) raises P0429 "Too many requests"; client_key() = caller IP from request headers.
+-- Public RPCs now wrapped (originals renamed _impl_*): submit_owner_request 5/h, submit_public_review 5/h, check_owner_request_status 20/10min,
+--   check_and_log_reset_request 8/h, get_public_receipt / _template / get_public_document_full 60/min, get_business_by_slug 60/min, record_client_activity 120/min.
+-- Anonymous execute REVOKED on signed-in-only functions (consent, shares, deposits, notifications, number reservation, generate_reference_code) and on all trigger functions.
+-- Default privileges: new public functions are no longer executable by anon/PUBLIC.
+-- Monitoring: app_events (RLS on, no policies); report_client_event(level,kind,message,path,version) 30/min, scrubbed server-side;
+--   admin_monitor_tail / admin_monitor_stats / admin_monitor_health (platform admins only).
+-- Installers: desktop_releases.external_url (https only). desktop-setup-link v5 returns it instead of a signed storage link.
+-- Edge functions wrapped with an IP rate limit and friendly 5xx (real reason scrubbed into app_events):
+--   track 120/min, desktop-ingest 60/min, desktop-setup-link 30/min, claim-owner-account 10/min, send-password-reset 6/10min, lookup-product 90/min, device-link 120/min.
+-- Still to do in the Supabase dashboard: Auth -> Providers/Passwords -> enable "Leaked password protection" (paid plans).
