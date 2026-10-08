@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, Search, X } from 'lucide-react';
+import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { Card, EmptyState, Skeleton, StatusBadge } from '../components/ui';
 import { Business } from '../lib/types';
 import { formatLastActive, activityLabel } from '../lib/time';
 
 type ActivityFilter = 'all' | 'active7d' | 'active30d' | 'inactive30d';
 
-export default function Businesses({ supabase, onOpen }: { supabase: SupabaseClient; onOpen: (id: string) => void }) {
+export default function Businesses({ supabase, onOpen, onNew }: { supabase: SupabaseClient; onOpen: (id: string) => void; onNew?: () => void }) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [userCounts, setUserCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,10 @@ export default function Businesses({ supabase, onOpen }: { supabase: SupabaseCli
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display font-semibold text-lg">Businesses</h2>
-        <span className="text-xs text-slate-500">{filtered.length} of {businesses.length}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500">{filtered.length} of {businesses.length}</span>
+          {onNew && <button onClick={onNew} className="btn-primary inline-flex items-center gap-1.5 min-h-[36px] px-3 text-sm"><Plus className="w-4 h-4" /> New business</button>}
+        </div>
       </div>
 
       <div className="relative">

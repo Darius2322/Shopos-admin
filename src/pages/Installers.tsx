@@ -91,8 +91,8 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
         {status && live.length === 0 && (
           <div className="rounded-xl bg-slate-800/60 p-3 text-xs text-slate-300 space-y-1.5">
             <p className="font-medium text-slate-200">Nothing has been published yet, so the library below is empty. Two ways to fill it:</p>
-            <p><b>1. Automatic (recommended).</b> In GitHub add the secret <code>SHOPOS_INGEST_TOKEN</code> to your app repo, then Actions → “Build desktop installers” → Run workflow. Each finished installer appears here by itself.</p>
-            <p><b>2. By hand.</b> Upload a file in “Add a new installer” below (limit 50 MB on Supabase’s free plan), or paste a download link in the box underneath. Installers are usually bigger than 50 MB, so a link (for example a GitHub release file) is the easy way.</p>
+            <p><b>1. Automatic (recommended).</b> In GitHub add the secret <code>SHOPOS_INGEST_TOKEN</code> to your app repo, then Actions → “Build desktop installers” → Run workflow. Each finished installer is zipped to save space and appears here by itself. Owners unzip it after downloading.</p>
+            <p><b>2. By hand.</b> Upload a file (a .zip is best, it saves space) in “Add a new installer” below (limit 50 MB on Supabase’s free plan), or paste a download link in the box underneath. Installers are usually bigger than 50 MB, so a link (for example a GitHub release file) is the easy way.</p>
           </div>
         )}
       </Card>

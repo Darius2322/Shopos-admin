@@ -46,21 +46,23 @@ function Tile({ label, value, sub }: { label: string; value: string | number; su
 }
 
 function Chart({ data, hourly }: { data: Point[]; hourly: boolean }) {
-  const W = 640, H = 170, P = { l: 30, r: 8, t: 10, b: 22 };
+  const W = 640, H = 180, P = { l: 34, r: 10, t: 12, b: 24 };
   const max = Math.max(1, ...data.map((d) => d.pageviews));
-  const x = (i: number) => P.l + (data.length <= 1 ? 0 : (i / (data.length - 1)) * (W - P.l - P.r));
+  const x = (i: number) => P.l + (data.length <= 1 ? (W - P.l - P.r) / 2 : (i / (data.length - 1)) * (W - P.l - P.r));
   const y = (v: number) => P.t + (1 - v / max) * (H - P.t - P.b);
-  const bw = Math.max(2, ((W - P.l - P.r) / Math.max(data.length, 1)) * 0.7);
-  const line = data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.visitors).toFixed(1)}`).join(' ');
+  const path = (key: 'pageviews' | 'visitors') => data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`).join(' ');
+  const area = data.length > 1 ? `${path('pageviews')} L${x(data.length - 1).toFixed(1)},${H - P.b} L${x(0).toFixed(1)},${H - P.b} Z` : '';
   const label = (b: string) => (hourly ? b.slice(11) : new Date(b).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }));
   const ticks = [0, Math.floor((data.length - 1) / 2), data.length - 1].filter((v, i, a) => data.length > 0 && a.indexOf(v) === i);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Visitors and page views over time">
-      {[0, 0.5, 1].map((f) => <g key={f}><line x1={P.l} x2={W - P.r} y1={y(max * f)} y2={y(max * f)} stroke="#334155" strokeWidth="0.6" /><text x={P.l - 4} y={y(max * f) + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{Math.round(max * f)}</text></g>)}
-      {data.map((d, i) => <rect key={d.bucket} x={x(i) - bw / 2} y={y(d.pageviews)} width={bw} height={Math.max(0, H - P.b - y(d.pageviews))} fill="#0e9f8e" opacity="0.55" rx="1"><title>{`${label(d.bucket)}: ${d.pageviews} page views · ${d.visitors} visitors · ${d.sessions} visits`}</title></rect>)}
-      {data.length > 1 && <path d={line} fill="none" stroke="#fbbf24" strokeWidth="1.8" strokeLinejoin="round" />}
-      {data.map((d, i) => <circle key={'c' + d.bucket} cx={x(i)} cy={y(d.visitors)} r={data.length > 45 ? 0 : 2.2} fill="#fbbf24"><title>{`${label(d.bucket)}: ${d.visitors} visitors`}</title></circle>)}
-      {ticks.map((i) => <text key={i} x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'} fontSize="9" fill="#94a3b8">{label(data[i].bucket)}</text>)}
+      <defs><linearGradient id="sa-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#14b8a6" stopOpacity="0.28" /><stop offset="100%" stopColor="#14b8a6" stopOpacity="0" /></linearGradient></defs>
+      {[0, 0.5, 1].map((f) => <g key={f}><line x1={P.l} x2={W - P.r} y1={y(max * f)} y2={y(max * f)} stroke="#334155" strokeWidth="0.6" strokeDasharray={f === 0 ? undefined : '3 4'} opacity={f === 0 ? 0.9 : 0.6} /><text x={P.l - 6} y={y(max * f) + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{Math.round(max * f)}</text></g>)}
+      {area && <path d={area} fill="url(#sa-area)" />}
+      {data.length > 1 && <path d={path('pageviews')} fill="none" stroke="#14b8a6" strokeOpacity="0.55" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />}
+      {data.length > 1 && <path d={path('visitors')} fill="none" stroke="#5eead4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
+      {data.map((d, i) => <g key={d.bucket}><rect x={x(i) - (W - P.l - P.r) / Math.max(data.length, 1) / 2} y={P.t} width={(W - P.l - P.r) / Math.max(data.length, 1)} height={H - P.t - P.b} fill="transparent"><title>{`${label(d.bucket)}: ${d.pageviews} page views · ${d.visitors} visitors · ${d.sessions} visits`}</title></rect>{data.length <= 31 && <circle cx={x(i)} cy={y(d.visitors)} r="2.4" fill="#0f172a" stroke="#5eead4" strokeWidth="1.5" pointerEvents="none" />}</g>)}
+      {ticks.map((i) => <text key={i} x={x(i)} y={H - 7} textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'} fontSize="9" fill="#94a3b8">{label(data[i].bucket)}</text>)}
     </svg>
   );
 }
@@ -73,7 +75,7 @@ function Bars({ rows, render }: { rows: Row[]; render?: (l: string) => string })
       {rows.map((r) => (
         <li key={r.label} className="text-xs">
           <div className="flex justify-between gap-2"><span className="truncate" title={r.label}>{render ? render(r.label) : r.label}</span><span className="tnum text-slate-300 shrink-0">{fmt(r.visitors)}<span className="text-slate-500"> · {fmt(r.pageviews)}</span></span></div>
-          <div className="h-1.5 rounded bg-slate-800 mt-0.5"><div className="h-full rounded bg-field-600" style={{ width: `${Math.max(3, (r.visitors / max) * 100)}%` }} /></div>
+          <div className="h-1 rounded-full bg-slate-800/80 mt-1"><div className="h-full rounded-full bg-gradient-to-r from-teal-600 to-teal-400" style={{ width: `${Math.max(3, (r.visitors / max) * 100)}%` }} /></div>
         </li>
       ))}
     </ul>
@@ -182,7 +184,7 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
           </div>
 
           <Card>
-            <div className="flex items-center justify-between mb-2 gap-3"><div className="text-sm font-medium">Traffic over time</div><div className="text-[11px] text-slate-400 flex items-center gap-3"><span className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm bg-field-600/70 inline-block" /> Page views</span><span className="inline-flex items-center gap-1"><i className="w-2.5 h-0.5 bg-amber-400 inline-block" /> Visitors</span></div></div>
+            <div className="flex items-center justify-between mb-2 gap-3"><div className="text-sm font-medium">Traffic over time</div><div className="text-[11px] text-slate-400 flex items-center gap-3"><span className="inline-flex items-center gap-1"><i className="w-2.5 h-0.5 bg-teal-500/60 inline-block" /> Page views</span><span className="inline-flex items-center gap-1"><i className="w-2.5 h-0.5 bg-teal-300 inline-block" /> Visitors</span></div></div>
             {series.length ? <Chart data={series} hourly={days <= 1} /> : <p className="text-xs text-slate-500">No data.</p>}
           </Card>
 
@@ -193,7 +195,7 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
                 {funnel.map((s, i) => (
                   <li key={s.step} className="text-xs">
                     <div className="flex justify-between"><span>{s.step}</span><span className="tnum text-slate-300">{fmt(s.visitors)}{i > 0 && funnel[0].visitors > 0 && <span className="text-slate-500"> · {Math.round((s.visitors / topFunnel) * 100)}%</span>}</span></div>
-                    <div className="h-2 rounded bg-slate-800 mt-0.5"><div className="h-full rounded bg-amber-400/80" style={{ width: `${Math.max(2, (s.visitors / topFunnel) * 100)}%` }} /></div>
+                    <div className="h-1.5 rounded-full bg-slate-800/80 mt-1"><div className="h-full rounded-full bg-gradient-to-r from-teal-600 to-teal-400" style={{ width: `${Math.max(2, (s.visitors / topFunnel) * 100)}%` }} /></div>
                   </li>
                 ))}
               </ul>

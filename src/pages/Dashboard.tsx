@@ -159,7 +159,7 @@ export default function Dashboard({ supabase, onOpenBusiness, onGo }: { supabase
                 <>
                   <div className="flex items-end gap-[2px] h-28" role="img" aria-label="Bar chart of transactions per day">
                     {(() => { const max = Math.max(...perDay.map((r) => r.transactions), 1); return perDay.map((r) => (
-                      <div key={r.day} className="flex-1 min-w-0 bg-field-600/80 hover:bg-field-500 rounded-t-sm" style={{ height: `${Math.max((r.transactions / max) * 100, r.transactions ? 4 : 1)}%` }}
+                      <div key={r.day} className="flex-1 min-w-0 bg-gradient-to-t from-teal-700 to-teal-400 opacity-90 hover:opacity-100 rounded-t" style={{ height: `${Math.max((r.transactions / max) * 100, r.transactions ? 4 : 1)}%` }}
                         title={`${new Date(r.day).toLocaleDateString()}: ${r.transactions} transactions · ${r.sales_amount.toLocaleString()} sold · ${r.active_businesses} shops trading`} />
                     )); })()}
                   </div>

@@ -16,7 +16,7 @@ const ARCHES: Record<Platform, { id: Arch; label: string }[]> = {
 const archLabel = (p: Platform, a: Arch) => ARCHES[p].find((x) => x.id === a)?.label ?? a;
 const mb = (n?: number | null) => (n ? `${(n / 1048576).toFixed(0)} MB` : '');
 const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux' };
-const EXT: Record<Platform, string[]> = { windows: ['.exe', '.msi'], mac: ['.dmg', '.pkg'], linux: ['.appimage', '.deb', '.rpm'] };
+const EXT: Record<Platform, string[]> = { windows: ['.zip', '.exe', '.msi'], mac: ['.zip', '.dmg', '.pkg'], linux: ['.zip', '.appimage', '.deb', '.rpm'] };
 const day = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : '');
 const clean = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
