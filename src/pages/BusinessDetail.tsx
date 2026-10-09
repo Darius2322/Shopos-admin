@@ -3,7 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, KeyRound, Pause, Play, RefreshCw, ShieldOff, Star, XCircle, Lock, Trash2, Undo2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
-import { DurationSelect, formatExpiry } from '../components/DurationSelect';
+import { formatExpiry } from '../components/DurationSelect';
+import { PackagePicker, PickerValue } from '../components/PackagePicker';
 import { Branch, Business, BusinessStatus, OtpStatusRow, Profile } from '../lib/types';
 import { describeError } from '../lib/errors';
 import { supabaseUrl } from '../lib/supabase';
@@ -36,7 +37,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   const [reasonPromptFor, setReasonPromptFor] = useState<BusinessStatus | null>(null);
   const [reasonText, setReasonText] = useState('');
   const [newCode, setNewCode] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | null>(12);
+  const [pick, setPick] = useState<PickerValue>({ months: 12, packageId: null });
   const [mainBranchBusyId, setMainBranchBusyId] = useState<string | null>(null);
 
   async function load() {
@@ -84,8 +85,9 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   async function generateCode() {
     setBusy(true); setError(null);
     try {
-      const { data, error: rpcError } = await supabase.rpc('admin_generate_otp', { p_business_id: businessId, p_duration_months: duration });
+      const { data, error: rpcError } = await supabase.rpc('admin_generate_otp', { p_business_id: businessId, p_duration_months: pick.months });
       if (rpcError) throw rpcError;
+      if (pick.packageId) await supabase.rpc('admin_set_business_package', { p_business_id: businessId, p_package_id: pick.packageId });
       setNewCode(data as string);
       await load();
     } catch (err) {
@@ -333,7 +335,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <DurationSelect value={duration} onChange={setDuration} />
+            <PackagePicker supabase={supabase} value={pick} onChange={setPick} />
             <button disabled={busy} onClick={generateCode} className="btn-primary text-xs px-2.5 py-1 flex items-center gap-1">
               <KeyRound className="w-3.5 h-3.5" /> {activeOtp ? 'Regenerate code' : 'Generate code'}
             </button>

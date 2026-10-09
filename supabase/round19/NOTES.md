@@ -1,0 +1,1 @@
+Round 19 database changes were applied live (packages, package_services, package_offers, package_requests, business_package_history, expiry freeze policies, device link limit trigger). Admin delete of packages is archive-only.

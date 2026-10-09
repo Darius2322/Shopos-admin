@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Menu } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { Centered } from './components/ui';
+import Packages from './pages/Packages';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
 import Sidebar, { Tab } from './components/Sidebar';
@@ -114,7 +115,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -188,6 +189,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'analytics' && <Analytics supabase={supabase} />}
             {tab === 'installers' && <Installers supabase={supabase} />}
             {tab === 'monitor' && <Monitor supabase={supabase} />}
+            {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>

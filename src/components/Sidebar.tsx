@@ -1,12 +1,13 @@
-import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, HardDrive, Database, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, HardDrive, Database, Trash2, Package } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
   ['requests', 'Owner Requests', Users],
   ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
+  ['packages', 'Packages', Package],
   ['softdelete', 'Soft Delete', Trash2],
   ['branches', 'Branches', Store],
   ['features', 'Feature Requests', Sparkles],

@@ -3,7 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { UserPlus } from 'lucide-react';
 import { Card, ErrorText } from '../components/ui';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
-import { DurationSelect } from '../components/DurationSelect';
+import { PackagePicker, PickerValue } from '../components/PackagePicker';
 import { supabaseUrl } from '../lib/supabase';
 
 export default function CreateBusiness({ supabase, onCreated }: { supabase: SupabaseClient; onCreated: (businessId: string) => void }) {
@@ -11,7 +11,7 @@ export default function CreateBusiness({ supabase, onCreated }: { supabase: Supa
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [businessName, setBusinessName] = useState('');
-  const [duration, setDuration] = useState<number | null>(12);
+  const [pick, setPick] = useState<PickerValue>({ months: 12, packageId: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ businessId: string; code: string } | null>(null);
@@ -24,10 +24,11 @@ export default function CreateBusiness({ supabase, onCreated }: { supabase: Supa
       const res = await fetch(`${supabaseUrl}/functions/v1/admin-create-business`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ fullName, email, phone: phone || null, businessName, durationMonths: duration })
+        body: JSON.stringify({ fullName, email, phone: phone || null, businessName, durationMonths: pick.months })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Could not create business');
+      if (pick.packageId && body.businessId) await supabase.rpc('admin_set_business_package', { p_business_id: body.businessId, p_package_id: pick.packageId });
       setResult({ businessId: body.businessId, code: body.activationCode });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create business — is the admin-create-business Edge Function deployed?');
@@ -68,8 +69,8 @@ export default function CreateBusiness({ supabase, onCreated }: { supabase: Supa
         <label className="block"><span className="block text-xs font-medium text-slate-400 mb-1">Business name</span>
           <input className="input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} required />
         </label>
-        <label className="block"><span className="block text-xs font-medium text-slate-400 mb-1">Access duration</span>
-          <DurationSelect value={duration} onChange={setDuration} />
+        <label className="block"><span className="block text-xs font-medium text-slate-400 mb-1">Package &amp; access duration</span>
+          <PackagePicker supabase={supabase} value={pick} onChange={setPick} />
         </label>
         <button disabled={busy} className="btn-primary w-full flex items-center justify-center gap-1.5">
           <UserPlus className="w-4 h-4" /> {busy ? 'Creating…' : 'Create business'}
