@@ -155,7 +155,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
               once, identically on mobile and desktop, so it's never the
               thing that goes missing when the viewport shrinks. */}
           <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 lg:border-t-0">
-            <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} />
+            <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
             <div className="flex items-center gap-1 ml-auto">
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
               <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />

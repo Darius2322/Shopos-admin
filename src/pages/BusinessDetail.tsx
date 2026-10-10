@@ -4,7 +4,8 @@ import { ArrowLeft, KeyRound, Pause, Play, RefreshCw, ShieldOff, Star, XCircle, 
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
 import { formatExpiry } from '../components/DurationSelect';
-import { PackagePicker, PickerValue } from '../components/PackagePicker';
+import { BusinessPlanPanel } from './Packages';
+import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components/PackagePicker';
 import { Branch, Business, BusinessStatus, OtpStatusRow, Profile } from '../lib/types';
 import { describeError } from '../lib/errors';
 import { supabaseUrl } from '../lib/supabase';
@@ -85,9 +86,10 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   async function generateCode() {
     setBusy(true); setError(null);
     try {
-      const { data, error: rpcError } = await supabase.rpc('admin_generate_otp', { p_business_id: businessId, p_duration_months: pick.months });
+      const { data, error: rpcError } = await supabase.rpc('admin_generate_otp', { p_business_id: businessId, p_duration_months: pickMonths(pick) });
       if (rpcError) throw rpcError;
-      if (pick.packageId) await supabase.rpc('admin_set_business_package', { p_business_id: businessId, p_package_id: pick.packageId });
+      const pickErr = await applyPick(supabase, businessId, pick);
+      if (pickErr) setError(pickErr);
       setNewCode(data as string);
       await load();
     } catch (err) {
@@ -320,6 +322,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
       )}
 
       {tab === 'access' && (<div id="section-activation" className="section-anchor">
+        <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Plan</h3>
+        <div className="mb-4"><BusinessPlanPanel supabase={supabase} businessId={businessId} onChanged={() => void load()} /></div>
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Activation & access</h3>
         <Card>
           <p className={`text-sm font-medium mb-3 ${business.activation_expires_at && new Date(business.activation_expires_at) < new Date() ? 'text-rust-500' : ''}`}>

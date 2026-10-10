@@ -3,7 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from '../components/ui';
 import { DesktopSetups } from '../components/DesktopSetups';
 import { friendlyError } from '../lib/friendlyError';
-import { CheckCircle2, AlertTriangle, Link2, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Link2, Loader2, GitBranch, Plus } from 'lucide-react';
 
 type Platform = 'windows' | 'mac' | 'linux';
 type Arch = 'x64' | 'ia32' | 'arm64' | 'universal';
@@ -15,6 +15,8 @@ const ARCHES: Record<Platform, { id: Arch; label: string }[]> = {
 const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux' };
 const clean = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
+interface GhAsset { name: string; size: number | null; url: string; platform: Platform | null; arch: Arch }
+interface GhRelease { version: string; published: string | null; notes: string; assets: GhAsset[] }
 interface Status { total: number; current: Record<Platform, number>; downloads: number }
 
 /** The Installers menu: what owners can download right now, how to add more, and the full library. */
@@ -30,6 +32,9 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
   const [makeCurrent, setMakeCurrent] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [gh, setGh] = useState<GhRelease | null>(null);
+  const [ghBusy, setGhBusy] = useState(false);
+  const [ghMsg, setGhMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [r, d] = await Promise.all([
@@ -67,6 +72,24 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
     } catch (e) { setMsg({ ok: false, text: friendlyError(e, 'Could not save the link.') }); } finally { setBusy(false); }
   }
 
+  /** Reads the newest GitHub release and offers each installer file with its link already filled in. */
+  async function fetchGithub() {
+    setGhBusy(true); setGhMsg(null); setGh(null);
+    const { data, error } = await supabase.functions.invoke('github-installer-assets', { body: { repo: 'Darius2322/shopos-app' } });
+    setGhBusy(false);
+    const d = data as (GhRelease & { error?: string; hint?: string }) | null;
+    if (error || !d || d.error) { setGhMsg(d?.hint ?? (d?.error === 'not_authorized' ? 'Only platform admins can do this.' : 'Could not read GitHub right now. Try again in a moment.')); return; }
+    if (d.assets.length === 0) setGhMsg('The newest release has no installer files attached.');
+    setGh(d);
+  }
+  function useAsset(a: GhAsset) {
+    if (!gh) return;
+    const pl = a.platform ?? 'windows';
+    setPlatform(pl); setArch(ARCHES[pl].some((x) => x.id === a.arch) ? a.arch : ARCHES[pl][0].id);
+    setVersion(gh.version); setUrl(a.url); setFileName(a.name); setNotes(gh.notes.split('\n')[0]?.slice(0, 200) ?? '');
+    setMsg({ ok: true, text: 'Link filled in below. Check it, then tap Add link.' });
+  }
+
   const live = status ? (['windows', 'mac', 'linux'] as Platform[]).filter((p) => status.current[p] > 0) : [];
 
   return (
@@ -94,6 +117,23 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
             <p><b>1. Automatic (recommended).</b> In GitHub add the secret <code>SHOPOS_INGEST_TOKEN</code> to your app repo, then Actions → “Build desktop installers” → Run workflow. Each finished installer is zipped to save space and appears here by itself. Owners unzip it after downloading.</p>
             <p><b>2. By hand.</b> Upload a file (a .zip is best, it saves space) in “Add a new installer” below (limit 50 MB on Supabase’s free plan), or paste a download link in the box underneath. Installers are usually bigger than 50 MB, so a link (for example a GitHub release file) is the easy way.</p>
           </div>
+        )}
+      </Card>
+
+      <Card className="space-y-2">
+        <div className="text-sm font-medium flex items-center gap-2"><GitBranch className="w-4 h-4" /> Fill the link from GitHub</div>
+        <p className="text-xs text-slate-400">Reads the newest GitHub release and fills in the version and download link for you. Works for public releases; for a private repository use the automatic build above.</p>
+        <button onClick={() => void fetchGithub()} disabled={ghBusy} className="btn-secondary min-h-[40px] px-4 text-sm inline-flex items-center gap-1.5">{ghBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />} {ghBusy ? 'Reading GitHub…' : 'Get the latest release'}</button>
+        {ghMsg && <p className="text-xs text-amber-400" role="status">{ghMsg}</p>}
+        {gh && gh.assets.length > 0 && (
+          <ul className="divide-y divide-slate-800 text-xs">
+            {gh.assets.map((a) => (
+              <li key={a.url} className="py-2 flex items-center justify-between gap-3">
+                <span className="min-w-0"><span className="block font-medium break-all">{a.name}</span><span className="text-slate-500">v{gh.version} · {a.platform ? LABEL[a.platform] : 'platform unknown'} · {a.arch}{a.size ? ` · ${(a.size / 1048576).toFixed(0)} MB` : ''}</span></span>
+                <button onClick={() => useAsset(a)} className="btn-secondary min-h-[34px] px-3 inline-flex items-center gap-1 shrink-0"><Plus className="w-3.5 h-3.5" /> Use</button>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
 

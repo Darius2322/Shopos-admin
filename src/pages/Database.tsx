@@ -12,8 +12,8 @@ interface Overview {
   tables: TableRow[];
 }
 
-type Sub = 'overview' | 'capacity' | 'health' | 'actions' | 'details';
-const SUBS: [Sub, string][] = [['overview', 'Overview'], ['capacity', 'Capacity'], ['health', 'Health'], ['actions', 'Quick actions'], ['details', 'Details']];
+type Sub = 'overview' | 'perbiz' | 'capacity' | 'health' | 'actions' | 'details';
+const SUBS: [Sub, string][] = [['overview', 'Overview'], ['perbiz', 'Per business'], ['capacity', 'Capacity'], ['health', 'Health'], ['actions', 'Quick actions'], ['details', 'Details']];
 
 const bytes = (b: number) => b >= 1073741824 ? `${(b / 1073741824).toFixed(2)} GB` : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${Math.round(b)} B`;
 const num = (v: number) => Math.floor(v).toLocaleString();
@@ -61,6 +61,7 @@ export default function DatabasePage({ supabase }: { supabase: SupabaseClient })
       {loading && !data ? <Skeleton /> : data && (
         <>
           {sub === 'overview' && <Overview d={data} />}
+          {sub === 'perbiz' && <PerBusiness supabase={supabase} />}
           {sub === 'capacity' && <Capacity d={data} supabase={supabase} onChanged={load} />}
           {sub === 'health' && <Health d={data} />}
           {sub === 'actions' && <Actions d={data} supabase={supabase} onDone={load} />}
@@ -236,6 +237,74 @@ function Details({ d }: { d: Overview }) {
           </tbody>
         </table>
       </Card>
+    </div>
+  );
+}
+
+interface BizUsage { id: string; name: string; status: string; created_at: string; rows: number; bytes: number; top: { table: string; rows: number; bytes: number }[] }
+interface Usage { businesses: BizUsage[]; db_bytes: number; limit_bytes: number; free_bytes: number; scoped_bytes: number; shared_bytes: number }
+
+/** How much of the database each business is using, how fast it is growing, and a rough guide to how many more businesses fit.
+ * Sizes are the real stored row sizes per business plus 35% for indexes, so they are estimates, not exact bytes. */
+function PerBusiness({ supabase }: { supabase: SupabaseClient }) {
+  const [u, setU] = useState<Usage | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    void supabase.rpc('admin_db_by_business').then(({ data, error }) => { if (error) setErr(friendlyError(error, 'Could not read per-business usage.')); else setU(data as Usage); });
+  }, [supabase]);
+  const calc = useMemo(() => {
+    if (!u) return null;
+    const list = u.businesses;
+    const totalBiz = list.reduce((s, b) => s + b.bytes, 0);
+    const avg = list.length ? totalBiz / list.length : 0;
+    const days = (b: BizUsage) => Math.max(1, (Date.now() - new Date(b.created_at).getTime()) / 86400000);
+    const perDay = list.reduce((s, b) => s + b.bytes / days(b), 0);
+    const fixed = u.shared_bytes;
+    const room = Math.max(0, u.free_bytes);
+    return { totalBiz, avg, perDay, room, fixed, daysLeft: perDay > 0 ? Math.floor(room / perDay) : null };
+  }, [u]);
+  if (err) return <Card><ErrorText>{err}</ErrorText></Card>;
+  if (!u || !calc) return <Skeleton />;
+  const max = Math.max(1, ...u.businesses.map((b) => b.bytes));
+  const shown = u.businesses.filter((b) => b.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const scenarios = [1, 5, 20, 50];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Tile label="Database total" value={bytes(u.db_bytes)} sub={`of ${bytes(u.limit_bytes)}`} />
+        <Tile label="Free space" value={bytes(u.free_bytes)} />
+        <Tile label="All businesses" value={bytes(calc.totalBiz)} sub={`${u.businesses.length} business${u.businesses.length === 1 ? '' : 'es'}`} />
+        <Tile label="Shared / system" value={bytes(u.shared_bytes)} sub="tables not owned by one business, indexes, logs" />
+      </div>
+      <Card className="space-y-2">
+        <div className="text-sm font-medium">How many more businesses can I add?</div>
+        <p className="text-xs text-slate-400">Today a business uses {bytes(calc.avg)} on average. The table shows how many more fit in the {bytes(calc.room)} that is free, if each one grows to the size on the left.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {scenarios.map((m) => <div key={m} className="rounded-xl bg-slate-800/70 p-3"><div className="text-[11px] text-slate-400">If each uses {m} MB</div><div className="text-lg font-semibold tnum">{num(Math.floor(calc.room / (m * 1048576)))}</div><div className="text-[11px] text-slate-500">more businesses</div></div>)}
+        </div>
+        <p className="text-xs text-slate-300">{calc.perDay > 0 ? <>At today's pace the businesses together add about <b>{bytes(calc.perDay)}</b> a day, so the free space would last roughly <b>{calc.daysLeft !== null && calc.daysLeft > 3650 ? 'more than 10 years' : `${num(calc.daysLeft ?? 0)} days`}</b> with no new businesses. New businesses and busier months shorten that.</> : 'There is not enough activity yet to measure growth.'}</p>
+      </Card>
+      <input className="input w-full" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a business" aria-label="Find a business" />
+      <div className="space-y-2">
+        {shown.length === 0 && <Card><p className="text-sm text-slate-500 text-center">No business matches.</p></Card>}
+        {shown.map((b) => (
+          <Card key={b.id} className="space-y-2">
+            <button onClick={() => setOpen(open === b.id ? null : b.id)} className="w-full text-left" aria-expanded={open === b.id}>
+              <div className="flex items-baseline justify-between gap-3"><span className="font-medium truncate">{b.name}</span><span className="tnum text-sm shrink-0">{bytes(b.bytes)}</span></div>
+              <div className="h-2 rounded-full bg-slate-800 overflow-hidden mt-1.5"><div className="h-full rounded-full bg-gradient-to-r from-teal-600 to-teal-400" style={{ width: `${(b.bytes / max) * 100}%`, minWidth: b.bytes ? 6 : 0 }} /></div>
+              <p className="text-[11px] text-slate-500 mt-1">{num(b.rows)} records · {u.db_bytes ? ((b.bytes / u.db_bytes) * 100).toFixed(1) : '0'}% of the database · since {new Date(b.created_at).toLocaleDateString()} · {b.status.replace(/_/g, ' ')}</p>
+            </button>
+            {open === b.id && (b.top.length === 0 ? <p className="text-xs text-slate-500">No records yet.</p> : (
+              <ul className="text-xs divide-y divide-slate-800 border-t border-slate-800">
+                {b.top.map((t) => <li key={t.table} className="py-1.5 flex justify-between gap-3"><span className="font-mono">{t.table}</span><span className="text-slate-400 tnum">{num(t.rows)} rows · {bytes(t.bytes)}</span></li>)}
+              </ul>
+            ))}
+          </Card>
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-500">Sizes count each business's own records. Line items that belong to a sale (not tagged with a business) are in "Shared / system". Supabase's dashboard is the final word on billing.</p>
     </div>
   );
 }

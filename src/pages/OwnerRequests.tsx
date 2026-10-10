@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Check, X, HelpCircle, Trash2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
-import { PackagePicker, PickerValue } from '../components/PackagePicker';
+import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components/PackagePicker';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
 import { OwnerRequest } from '../lib/types';
 import { supabaseUrl } from '../lib/supabase';
@@ -47,14 +47,14 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          ownerRequestId: request.id, durationMonths: (durationByRequest[request.id] ?? { months: 12, packageId: null }).months,
+          ownerRequestId: request.id, durationMonths: pickMonths(durationByRequest[request.id] ?? { months: 12, packageId: null }),
           skipInviteEmail: !!skipEmailByRequest[request.id]
         })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Approval failed');
       const pkgChoice = durationByRequest[request.id];
-      if (pkgChoice?.packageId && body.businessId) await supabase.rpc('admin_set_business_package', { p_business_id: body.businessId, p_package_id: pkgChoice.packageId });
+      if (body.businessId) { const pe = await applyPick(supabase, body.businessId, pkgChoice ?? { months: 12, packageId: null }); if (pe) setError(pe); }
       if (body.activationCode) {
         setApprovedCode({
           businessName: request.business_name, code: body.activationCode,

@@ -3,7 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { UserPlus } from 'lucide-react';
 import { Card, ErrorText } from '../components/ui';
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
-import { PackagePicker, PickerValue } from '../components/PackagePicker';
+import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components/PackagePicker';
 import { supabaseUrl } from '../lib/supabase';
 
 export default function CreateBusiness({ supabase, onCreated }: { supabase: SupabaseClient; onCreated: (businessId: string) => void }) {
@@ -24,11 +24,11 @@ export default function CreateBusiness({ supabase, onCreated }: { supabase: Supa
       const res = await fetch(`${supabaseUrl}/functions/v1/admin-create-business`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ fullName, email, phone: phone || null, businessName, durationMonths: pick.months })
+        body: JSON.stringify({ fullName, email, phone: phone || null, businessName, durationMonths: pickMonths(pick) })
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Could not create business');
-      if (pick.packageId && body.businessId) await supabase.rpc('admin_set_business_package', { p_business_id: body.businessId, p_package_id: pick.packageId });
+      if (body.businessId) { const pe = await applyPick(supabase, body.businessId, pick); if (pe) setError(pe); }
       setResult({ businessId: body.businessId, code: body.activationCode });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create business — is the admin-create-business Edge Function deployed?');
