@@ -1,5 +1,7 @@
 import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, HardDrive, Database, Trash2, Package } from 'lucide-react';
 
+import { BadgeDot, badgeFor, type Badges } from '../lib/badges';
+
 export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages';
 
 export const TABS: [Tab, string, any][] = [
@@ -28,9 +30,10 @@ interface SidebarProps {
   onSignOut: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  badges: Badges;
 }
 
-function NavList({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void }) {
+function NavList({ tab, onSelect, badges }: { tab: Tab; onSelect: (tab: Tab) => void; badges: Badges }) {
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
       {TABS.map(([key, label, Icon]) => (
@@ -41,7 +44,7 @@ function NavList({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void }) 
             tab === key ? 'bg-field-600 text-paper' : 'text-slate-400 hover:bg-slate-800 hover:text-ink'
           }`}
         >
-          <Icon className="w-4 h-4 shrink-0" /> {label}
+          <Icon className="w-4 h-4 shrink-0" /> <span className="flex-1 truncate">{label}</span><BadgeDot n={badgeFor(badges, key)} />
         </button>
       ))}
     </nav>
@@ -57,7 +60,7 @@ function Brand() {
   );
 }
 
-export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseMobile }: SidebarProps) {
+export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseMobile, badges }: SidebarProps) {
   function select(t: Tab) {
     onSelect(t);
     onCloseMobile();
@@ -69,7 +72,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
           main content's scroll container. */}
       <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 h-screen border-r border-slate-700 bg-paper">
         <Brand />
-        <NavList tab={tab} onSelect={select} />
+        <NavList tab={tab} onSelect={select} badges={badges} />
         <div className="p-3 border-t border-slate-700 shrink-0">
           <button onClick={onSignOut} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-ink">
             <LogOut className="w-4 h-4" /> Sign out
@@ -93,7 +96,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <NavList tab={tab} onSelect={select} />
+            <NavList tab={tab} onSelect={select} badges={badges} />
             <div className="p-3 border-t border-slate-700 shrink-0">
               <button onClick={onSignOut} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-ink">
                 <LogOut className="w-4 h-4" /> Sign out

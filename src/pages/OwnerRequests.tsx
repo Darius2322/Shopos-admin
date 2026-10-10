@@ -18,12 +18,15 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
   const [durationByRequest, setDurationByRequest] = useState<Record<string, PickerValue>>({});
   const [skipEmailByRequest, setSkipEmailByRequest] = useState<Record<string, boolean>>({});
   const [linkCopied, setLinkCopied] = useState(false);
+  const [pkgNames, setPkgNames] = useState<Record<string, string>>({});
+  useEffect(() => { void supabase.from('packages').select('id, name').then(({ data }) => setPkgNames(Object.fromEntries((data ?? []).map((p: { id: string; name: string }) => [p.id, p.name])))); }, [supabase]);
 
   async function load() {
     setLoading(true);
     const { data } = await supabase.from('owner_requests').select('*').order('created_at', { ascending: false }).limit(200);
     setRequests(data ?? []);
     setLoading(false);
+    window.dispatchEvent(new Event('badges:refresh'));
   }
   useEffect(() => { load(); }, []);
 
@@ -47,7 +50,7 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          ownerRequestId: request.id, durationMonths: pickMonths(durationByRequest[request.id] ?? { months: 12, packageId: null }),
+          ownerRequestId: request.id, durationMonths: pickMonths(durationByRequest[request.id] ?? { months: 12, packageId: request.requested_package_id ?? null }),
           skipInviteEmail: !!skipEmailByRequest[request.id]
         })
       });
@@ -98,6 +101,12 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
                 {r.full_name} · {r.email}{r.phone ? ` · ${r.phone}` : ''}
               </div>
               <div className="text-xs text-slate-500 mt-0.5">Ref: {r.reference_code ?? '—'} · {new Date(r.created_at).toLocaleString()}</div>
+              {(r.requested_package_id || r.requested_business_type) && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {r.requested_package_id && <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300">Wants package: {pkgNames[r.requested_package_id] ?? 'chosen on the website'}</span>}
+                  {r.requested_business_type && <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">Type: {r.requested_business_type.replace(/_/g, ' ')}</span>}
+                </div>
+              )}
               {r.message && <p className="text-xs text-slate-400 mt-2 italic">"{r.message}"</p>}
               {r.decision_reason && (
                 <p className="text-xs text-slate-400 mt-2">Reason: {r.decision_reason}</p>
@@ -112,7 +121,7 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
                   {r.status === 'rejected' ? 'Rejected — you can still approve this if you change your mind.' : 'Waiting on the applicant, or approve now if you have enough information.'}
                 </span>
               )}
-              <PackagePicker supabase={supabase} value={durationByRequest[r.id] ?? { months: 12, packageId: null }} onChange={(v) => setDurationByRequest((d) => ({ ...d, [r.id]: v }))} />
+              <PackagePicker supabase={supabase} value={durationByRequest[r.id] ?? { months: 12, packageId: r.requested_package_id ?? null }} onChange={(v) => setDurationByRequest((d) => ({ ...d, [r.id]: v }))} />
               <label className="flex items-center gap-1.5 text-xs text-slate-500">
                 <input
                   type="checkbox"

@@ -78,6 +78,8 @@ export interface OwnerRequest {
   decided_at: string | null;
   decision_reason: string | null;
   created_at: string;
+  requested_package_id?: string | null;
+  requested_business_type?: string | null;
 }
 
 export interface SupportTicket {

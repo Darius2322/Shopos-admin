@@ -6,6 +6,7 @@ import { Centered } from './components/ui';
 import Packages from './pages/Packages';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
+import { useBadges } from './lib/badges';
 import Sidebar, { Tab } from './components/Sidebar';
 import { GlobalSearch } from './components/GlobalSearch';
 import { NotificationsMenu } from './components/NotificationsMenu';
@@ -123,6 +124,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   const [openBusinessId, setOpenBusinessId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
+  const badges = useBadges(supabase);
 
   function openBusiness(id: string) {
     setOpenBusinessId(id);
@@ -140,13 +142,14 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
     // the sidebar becomes a drawer opened from the hamburger button below
     // instead of a horizontal tab strip that could hide items off-screen.
     <div className="h-screen flex overflow-hidden bg-paper text-ink">
-      <Sidebar tab={tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
+      <Sidebar tab={tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col h-screen">
         <header className="shrink-0 border-b border-slate-700 bg-paper">
           <div className="flex items-center gap-3 px-4 py-3 lg:hidden">
-            <button aria-label="Open menu" onClick={() => setMobileNavOpen(true)} className="p-1.5 -ml-1.5 text-slate-400 hover:text-ink">
+            <button aria-label="Open menu" onClick={() => setMobileNavOpen(true)} className="relative p-1.5 -ml-1.5 text-slate-400 hover:text-ink">
               <Menu className="w-5 h-5" />
+              {Object.entries(badges).some(([k, v]) => k !== 'packages_expiring' && v > 0) && <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rust-500" aria-label="New items" />}
             </button>
             <span className="font-display font-semibold text-sm">{TAB_LABELS[tab]}</span>
           </div>
