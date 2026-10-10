@@ -5,6 +5,7 @@ import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../component
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
 import { formatExpiry } from '../components/DurationSelect';
 import { BusinessPlanPanel } from './Packages';
+import { BusinessRules } from '../components/BusinessRules';
 import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components/PackagePicker';
 import { Branch, Business, BusinessStatus, OtpStatusRow, Profile } from '../lib/types';
 import { describeError } from '../lib/errors';
@@ -382,6 +383,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
         </Card>
       </div>)}
 
+      {tab === 'access' && (<div id="section-rules" className="section-anchor"><h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Branch limit, price rules and branch activity</h3><BusinessRules supabase={supabase} businessId={businessId} branches={branches} onChanged={load} /></div>)}
       {tab === 'access' && (<div id="section-branches" className="section-anchor">
         <h3 className="font-display font-semibold text-sm mb-2 text-slate-400">Branches ({branches.length})</h3>
         <Card className="flex items-center justify-between gap-3 mb-2">
