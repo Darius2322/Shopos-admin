@@ -4,19 +4,22 @@ import { Card } from './ui';
 import { friendlyError } from '../lib/friendlyError';
 import { Check, X, Ban, Upload, Loader2, Download, Star, EyeOff, Copy, RotateCcw, HardDrive } from 'lucide-react';
 
-type Platform = 'windows' | 'mac' | 'linux';
+type Platform = 'windows' | 'mac' | 'linux' | 'android' | 'ios';
 interface Row { id: string; business_id: string; platform: Platform; status: 'pending' | 'approved' | 'rejected' | 'revoked'; reason: string | null; admin_reason: string | null; expires_at: string | null; download_count: number; last_download_at: string | null; created_at: string; businesses: { name: string } | null }
 type Arch = 'x64' | 'ia32' | 'arm64' | 'universal';
 interface Rel { id: string; platform: Platform; arch: Arch; version: string; file_name: string; file_path: string; external_url?: string | null; size_bytes: number | null; sha256: string | null; notes: string | null; created_at: string; published: boolean; is_current: boolean }
 const ARCHES: Record<Platform, { id: Arch; label: string }[]> = {
   windows: [{ id: 'x64', label: '64-bit (most tills)' }, { id: 'ia32', label: '32-bit (older tills)' }, { id: 'arm64', label: 'ARM' }],
   mac: [{ id: 'universal', label: 'Intel + Apple chip' }, { id: 'x64', label: 'Intel only' }, { id: 'arm64', label: 'Apple chip only' }],
-  linux: [{ id: 'x64', label: '64-bit' }, { id: 'arm64', label: 'ARM (Raspberry Pi)' }]
+  linux: [{ id: 'x64', label: '64-bit' }, { id: 'arm64', label: 'ARM (Raspberry Pi)' }],
+  android: [{ id: 'universal', label: 'All phones (APK)' }],
+  ios: [{ id: 'universal', label: 'iPhone and iPad' }]
 };
 const archLabel = (p: Platform, a: Arch) => ARCHES[p].find((x) => x.id === a)?.label ?? a;
 const mb = (n?: number | null) => (n ? `${(n / 1048576).toFixed(0)} MB` : '');
-const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux' };
-const EXT: Record<Platform, string[]> = { windows: ['.zip', '.exe', '.msi'], mac: ['.zip', '.dmg', '.pkg'], linux: ['.zip', '.appimage', '.deb', '.rpm'] };
+const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux', android: 'Android', ios: 'iPhone / iPad' };
+const ALL_PLATFORMS: Platform[] = ['windows', 'mac', 'linux', 'android', 'ios'];
+const EXT: Record<Platform, string[]> = { windows: ['.zip', '.exe', '.msi'], mac: ['.zip', '.dmg', '.pkg'], linux: ['.zip', '.appimage', '.deb', '.rpm'], android: ['.apk'], ios: ['.ipa'] };
 const day = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : '');
 const clean = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
@@ -169,7 +172,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
         <div className="text-sm font-medium flex items-center gap-2"><HardDrive className="w-4 h-4" /> Installer library</div>
         <p className="text-xs text-slate-400">Every version you upload is kept here. The one marked <b>Current</b> is what shop owners download from More → Desktop app, with no request or approval needed. Builds from GitHub appear here by themselves. When you update the app, upload the new build, then make it current. You can go back to an older version at any time. Download any file to put on a USB stick and install on tills without internet.</p>
         {dlMsg && <p className="text-xs text-slate-300 break-all">{dlMsg}</p>}
-        {(['windows', 'mac', 'linux'] as Platform[]).map((p) => {
+        {ALL_PLATFORMS.map((p) => {
           const list = rels.filter((x) => x.platform === p);
           return (
             <div key={p} className="border-t border-slate-800 pt-2">
@@ -204,7 +207,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
         <div className="text-sm font-medium">Add a new installer or update</div>
         <p className="text-xs text-slate-400">Normally you do not need this: running GitHub → Actions → “Build desktop installers” publishes every installer here automatically. Use this form only to add a file by hand (for example a build you made elsewhere). Owners download through a private two-minute link.</p>
         <div className="grid grid-cols-2 gap-2">
-          <select value={pubPlatform} onChange={(e) => { const p = e.target.value as Platform; setPubPlatform(p); setPubArch(ARCHES[p][0].id); }} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{(['windows', 'mac', 'linux'] as Platform[]).map((p) => <option key={p} value={p}>{LABEL[p]} ({EXT[p].join(' / ')})</option>)}</select>
+          <select value={pubPlatform} onChange={(e) => { const p = e.target.value as Platform; setPubPlatform(p); setPubArch(ARCHES[p][0].id); }} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{ALL_PLATFORMS.map((p) => <option key={p} value={p}>{LABEL[p]} ({EXT[p].join(' / ')})</option>)}</select>
           <select value={pubArch} onChange={(e) => setPubArch(e.target.value as Arch)} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{ARCHES[pubPlatform].map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}</select>
         </div>
         <input value={pubVersion} onChange={(e) => setPubVersion(e.target.value)} placeholder="Version e.g. 1.1.0" className="w-full bg-slate-800 rounded-lg px-3 py-2.5 text-sm" />

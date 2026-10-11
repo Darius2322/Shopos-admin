@@ -5,14 +5,17 @@ import { DesktopSetups } from '../components/DesktopSetups';
 import { friendlyError } from '../lib/friendlyError';
 import { CheckCircle2, AlertTriangle, Link2, Loader2, GitBranch, Plus } from 'lucide-react';
 
-type Platform = 'windows' | 'mac' | 'linux';
+type Platform = 'windows' | 'mac' | 'linux' | 'android' | 'ios';
 type Arch = 'x64' | 'ia32' | 'arm64' | 'universal';
 const ARCHES: Record<Platform, { id: Arch; label: string }[]> = {
   windows: [{ id: 'x64', label: '64-bit (most tills)' }, { id: 'ia32', label: '32-bit (older tills)' }, { id: 'arm64', label: 'ARM' }],
   mac: [{ id: 'universal', label: 'Intel + Apple chip' }, { id: 'x64', label: 'Intel only' }, { id: 'arm64', label: 'Apple chip only' }],
-  linux: [{ id: 'x64', label: '64-bit' }, { id: 'arm64', label: 'ARM (Raspberry Pi)' }]
+  linux: [{ id: 'x64', label: '64-bit' }, { id: 'arm64', label: 'ARM (Raspberry Pi)' }],
+  android: [{ id: 'universal', label: 'All phones (APK)' }],
+  ios: [{ id: 'universal', label: 'iPhone and iPad (TestFlight / App Store link)' }]
 };
-const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux' };
+const LABEL: Record<Platform, string> = { windows: 'Windows', mac: 'Mac', linux: 'Linux', android: 'Android', ios: 'iPhone / iPad' };
+const PLATFORMS: Platform[] = ['windows', 'mac', 'linux', 'android', 'ios'];
 const clean = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
 interface GhAsset { name: string; size: number | null; url: string; platform: Platform | null; arch: Arch }
@@ -42,7 +45,7 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
       supabase.from('desktop_downloads').select('id', { count: 'exact', head: true })
     ]);
     const rows = (r.data ?? []) as { platform: Platform; is_current: boolean; published: boolean }[];
-    const current: Record<Platform, number> = { windows: 0, mac: 0, linux: 0 };
+    const current: Record<Platform, number> = { windows: 0, mac: 0, linux: 0, android: 0, ios: 0 };
     for (const x of rows) if (x.is_current && x.published) current[x.platform] += 1;
     setStatus({ total: rows.length, current, downloads: d.count ?? 0 });
   }, [supabase]);
@@ -90,13 +93,13 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
     setMsg({ ok: true, text: 'Link filled in below. Check it, then tap Add link.' });
   }
 
-  const live = status ? (['windows', 'mac', 'linux'] as Platform[]).filter((p) => status.current[p] > 0) : [];
+  const live = status ? PLATFORMS.filter((p) => status.current[p] > 0) : [];
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="font-display font-semibold text-lg">Installers</h2>
-        <p className="text-xs text-slate-400">The desktop setup files shop owners download from More → Desktop app. No request or approval is needed.</p>
+        <p className="text-xs text-slate-400">The desktop setup files (More → Desktop app) and the Android / iPhone apps (More → Mobile apps) that owners download. No request or approval is needed. For iPhone, add the TestFlight or App Store link.</p>
       </div>
 
       <Card className="space-y-2">
@@ -141,7 +144,7 @@ export default function Installers({ supabase }: { supabase: SupabaseClient }) {
         <div className="text-sm font-medium flex items-center gap-2"><Link2 className="w-4 h-4" /> Link an installer hosted elsewhere</div>
         <p className="text-xs text-slate-400">For files too big to upload. Paste the https download link; owners get that link when they tap Download. Add the checksum afterwards if you have one.</p>
         <div className="grid grid-cols-2 gap-2">
-          <select value={platform} onChange={(e) => { const p = e.target.value as Platform; setPlatform(p); setArch(ARCHES[p][0].id); }} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{(['windows', 'mac', 'linux'] as Platform[]).map((p) => <option key={p} value={p}>{LABEL[p]}</option>)}</select>
+          <select value={platform} onChange={(e) => { const p = e.target.value as Platform; setPlatform(p); setArch(ARCHES[p][0].id); }} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{PLATFORMS.map((p) => <option key={p} value={p}>{LABEL[p]}</option>)}</select>
           <select value={arch} onChange={(e) => setArch(e.target.value as Arch)} className="bg-slate-800 rounded-lg px-3 py-2.5 text-sm">{ARCHES[platform].map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}</select>
         </div>
         <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="Version e.g. 1.1.0" className="w-full bg-slate-800 rounded-lg px-3 py-2.5 text-sm" />
