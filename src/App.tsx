@@ -24,9 +24,8 @@ import Support from './pages/Support';
 import PlatformSettingsPage from './pages/PlatformSettings';
 import RoleDefaultsPage from './pages/RoleDefaults';
 import Reviews from './pages/Reviews';
-import AppReleases from './pages/AppReleases';
 import Analytics from './pages/Analytics';
-import Installers from './pages/Installers';
+import AppsAndUpdates from './pages/AppsAndUpdates';
 import Monitor from './pages/Monitor';
 import { friendlyError } from './lib/friendlyError';
 
@@ -117,7 +116,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -143,7 +142,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
     // the sidebar becomes a drawer opened from the hamburger button below
     // instead of a horizontal tab strip that could hide items off-screen.
     <div className="h-screen flex overflow-hidden bg-paper text-ink">
-      <Sidebar tab={tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} badges={badges} />
+      <Sidebar tab={tab === 'installers' || tab === 'releases' ? 'apps' : tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col h-screen">
         <header className="shrink-0 border-b border-slate-700 bg-paper">
@@ -189,9 +188,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'support' && <Support supabase={supabase} />}
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
             {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
-            {tab === 'releases' && <AppReleases supabase={supabase} />}
+            {(tab === 'apps' || tab === 'releases' || tab === 'installers') && <AppsAndUpdates key={tab} supabase={supabase} start={tab === 'installers' ? 'installers' : 'updates'} badges={badges} />}
             {tab === 'analytics' && <Analytics supabase={supabase} />}
-            {tab === 'installers' && <Installers supabase={supabase} />}
             {tab === 'monitor' && <Monitor supabase={supabase} />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}

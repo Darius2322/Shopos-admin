@@ -40,7 +40,7 @@ export function useBadges(supabase: SupabaseClient): Badges {
 
 export const badgeFor = (b: Badges, tab: string): number =>
   tab === 'requests' ? b.requests : tab === 'packages' ? b.package_requests : tab === 'features' ? b.features
-  : tab === 'reviews' ? b.reviews : tab === 'support' ? b.support : tab === 'installers' ? b.installers : 0;
+  : tab === 'reviews' ? b.reviews : tab === 'support' ? b.support : (tab === 'installers' || tab === 'apps') ? b.installers : 0;
 
 export function BadgeDot({ n, className = '' }: { n: number; className?: string }) {
   if (!n) return null;

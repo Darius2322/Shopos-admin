@@ -1,8 +1,8 @@
-import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, HardDrive, Database, Trash2, Package, Palette } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Trash2, Package, Palette } from 'lucide-react';
 
 import { BadgeDot, badgeFor, type Badges } from '../lib/badges';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -16,8 +16,7 @@ export const TABS: [Tab, string, any][] = [
   ['features', 'Feature Requests', Sparkles],
   ['reviews', 'Reviews', Star],
   ['permissions', 'Role Defaults', ShieldCheck],
-  ['releases', 'App Updates', RefreshCw],
-  ['installers', 'Installers', HardDrive],
+  ['apps', 'Apps & Updates', RefreshCw],
   ['database', 'Database', Database],
   ['monitor', 'Monitor', Terminal],
   ['audit', 'Audit Logs', ScrollText],
