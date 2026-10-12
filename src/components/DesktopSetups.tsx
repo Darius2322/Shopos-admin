@@ -95,13 +95,13 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
 
   /** Admin download (for a USB stick). The link works for one hour and only for platform admins. */
   async function adminDownload(x: Rel) {
-    if (x.external_url) { setDlMsg(`Opening the download link for ${x.file_name}${x.sha256 ? `. SHA-256: ${x.sha256}` : ''}`); window.open(x.external_url, '_blank', 'noopener,noreferrer'); return; }
+    if (x.external_url) { setDlMsg(`Opening the download link for ${x.file_name}${x.sha256 ? `. SHA-256: ${x.sha256}` : ''}`); const a = document.createElement('a'); a.href = x.external_url; a.download = x.file_name; a.target = '_blank'; a.rel = 'noopener noreferrer'; document.body.appendChild(a); a.click(); a.remove(); return; }
     setBusy(`dl-${x.id}`); setDlMsg(null);
     const { data, error: e } = await supabase.storage.from('desktop-installers').createSignedUrl(x.file_path, 3600, { download: x.file_name });
     setBusy(null);
     if (e || !data?.signedUrl) { setDlMsg(friendlyError(e, 'Could not prepare the download.')); return; }
     setDlMsg(`Downloading ${x.file_name}${x.sha256 ? `. SHA-256: ${x.sha256}` : ''}`);
-    window.location.href = data.signedUrl;
+    const a = document.createElement('a'); a.href = data.signedUrl; a.download = x.file_name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
   }
   async function copyHash(h: string) { try { await navigator.clipboard.writeText(h); setDlMsg('Checksum copied.'); } catch { setDlMsg(h); } }
 
@@ -188,7 +188,7 @@ export function DesktopSetups({ supabase }: { supabase: SupabaseClient }) {
                         {x.notes && <div className="text-slate-400 mt-0.5">{x.notes}</div>}
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button title="Download (for USB)" disabled={busy === `dl-${x.id}`} onClick={() => adminDownload(x)} className="bg-slate-700 text-slate-100 rounded-lg px-2.5 min-h-[32px] inline-flex items-center">{busy === `dl-${x.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}</button>
+                        <button title="Download (for USB)" disabled={busy === `dl-${x.id}`} onClick={() => adminDownload(x)} className="bg-slate-700 text-slate-100 rounded-lg px-2.5 min-h-[32px] inline-flex items-center">{busy === `dl-${x.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}<span className="ml-1.5 text-xs font-medium">Download</span></button>
                         {x.sha256 && <button title="Copy checksum" onClick={() => copyHash(x.sha256!)} className="bg-slate-700 text-slate-100 rounded-lg px-2.5 min-h-[32px] inline-flex items-center"><Copy className="w-3.5 h-3.5" /></button>}
                         {!x.is_current && <button title="Make current" disabled={busy === `cur-${x.id}`} onClick={() => makeCurrent(x.id)} className="bg-field-600 text-white rounded-lg px-2.5 min-h-[32px] inline-flex items-center gap-1">{busy === `cur-${x.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Star className="w-3.5 h-3.5" />}</button>}
                         {x.published && <button title="Pull (hide from shops)" disabled={busy === `pull-${x.id}`} onClick={() => pull(x.id)} className="bg-slate-700 text-slate-100 rounded-lg px-2.5 min-h-[32px] inline-flex items-center"><EyeOff className="w-3.5 h-3.5" /></button>}
