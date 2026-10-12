@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { RefreshCw, HardDrive } from 'lucide-react';
+import { RefreshCw, HardDrive, Users } from 'lucide-react';
+import { AppUsage } from '../components/AppUsage';
 import AppReleases from './AppReleases';
 import Installers from './Installers';
 import { BadgeDot, type Badges } from '../lib/badges';
 
-type Sub = 'updates' | 'installers';
+type Sub = 'updates' | 'installers' | 'usage';
 
 /** Apps & Updates: the app release notes (App Updates) and the installer library (Windows, Mac, Linux, Android APK, iPhone link)
  * in one menu, each a sub-menu. */
 export default function AppsAndUpdates({ supabase, start = 'updates', badges }: { supabase: SupabaseClient; start?: Sub; badges: Badges }) {
   const [sub, setSub] = useState<Sub>(start);
-  const items: [Sub, string, typeof RefreshCw, number][] = [['updates', 'App Updates', RefreshCw, 0], ['installers', 'Installers (desktop, Android, iPhone)', HardDrive, badges.installers]];
+  const items: [Sub, string, typeof RefreshCw, number][] = [['updates', 'App Updates', RefreshCw, 0], ['installers', 'Installers (desktop, Android, iPhone)', HardDrive, badges.installers], ['usage', 'Who uses ShopOS', Users, 0]];
   return (
     <div className="space-y-4">
       <div role="tablist" aria-label="Apps and updates" className="flex gap-1 border-b border-slate-700 overflow-x-auto">
@@ -22,7 +23,7 @@ export default function AppsAndUpdates({ supabase, start = 'updates', badges }: 
           </button>
         ))}
       </div>
-      {sub === 'updates' ? <AppReleases supabase={supabase} /> : <Installers supabase={supabase} />}
+      {sub === 'updates' ? <AppReleases supabase={supabase} /> : sub === 'installers' ? <Installers supabase={supabase} /> : <AppUsage supabase={supabase} />}
     </div>
   );
 }
