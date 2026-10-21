@@ -10,6 +10,7 @@ import SoftDelete from './pages/SoftDelete';
 import { useBadges } from './lib/badges';
 import Sidebar, { Tab } from './components/Sidebar';
 import { GlobalSearch } from './components/GlobalSearch';
+import { SearchEverything } from './components/SearchEverything';
 import { NotificationsMenu } from './components/NotificationsMenu';
 import { ThemeToggle, useTheme } from './components/ThemeToggle';
 import Dashboard from './pages/Dashboard';
@@ -161,6 +162,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
           <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 lg:border-t-0">
             <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
             <div className="flex items-center gap-1 ml-auto">
+              <SearchEverything supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
               <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />
             </div>
