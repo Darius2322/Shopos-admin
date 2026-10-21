@@ -10,6 +10,7 @@ import SoftDelete from './pages/SoftDelete';
 import { useBadges } from './lib/badges';
 import Sidebar, { Tab } from './components/Sidebar';
 import { GlobalSearch } from './components/GlobalSearch';
+import { SearchEverything } from './components/SearchEverything';
 import { NotificationsMenu } from './components/NotificationsMenu';
 import { ThemeToggle, useTheme } from './components/ThemeToggle';
 import Dashboard from './pages/Dashboard';
@@ -27,6 +28,7 @@ import Reviews from './pages/Reviews';
 import Analytics from './pages/Analytics';
 import AppsAndUpdates from './pages/AppsAndUpdates';
 import Monitor from './pages/Monitor';
+import OtherAppsPage from './pages/OtherApps';
 import { friendlyError } from './lib/friendlyError';
 
 export default function App() {
@@ -116,7 +118,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', otherapps: 'Other apps', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -160,6 +162,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
           <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 lg:border-t-0">
             <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
             <div className="flex items-center gap-1 ml-auto">
+              <SearchEverything supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
               <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />
             </div>
@@ -194,6 +197,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
+            {tab === 'otherapps' && <OtherAppsPage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>
         </main>
