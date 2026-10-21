@@ -1,0 +1,4 @@
+-- Anyone can submit a review; visible immediately; admin hides (status='rejected') / unhides / deletes.
+-- submit_public_review(p_name, p_rating, p_body): validation, link ban, duplicate-text and hourly caps.
+-- admin_set_review_visibility(p_review_id, p_visible): records moderated_by/at + admin_actions row.
+-- (See the live function definitions; this file documents the change.)
