@@ -31,7 +31,7 @@ function toThumb(file: File): Promise<string> {
 
 function Thumb({ a, className = '' }: { a: Pick<OtherApp, 'name' | 'color' | 'thumb'>; className?: string }) {
   return a.thumb
-    ? <img src={a.thumb} alt="" className={`object-cover ${className}`} />
+    ? <span className={`flex items-center justify-center bg-slate-800 overflow-hidden ${className}`}><img src={a.thumb} alt="" className="max-w-full max-h-full object-contain" /></span>
     : <span className={`flex items-center justify-center text-white font-semibold ${className}`} style={{ background: a.color }}>{a.name.slice(0, 1).toUpperCase() || '?'}</span>;
 }
 
