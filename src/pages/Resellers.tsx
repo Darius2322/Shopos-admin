@@ -4,6 +4,7 @@ import { Plus, Search, Link2, Wallet, Save, Copy } from 'lucide-react';
 import { Card, ErrorText, Skeleton } from '../components/ui';
 
 interface Reseller { id: string; name: string; phone: string | null; code: string; commission_pct: number; status: string; shops: number; owed: number; paid: number }
+interface App { id: string; name: string; phone: string; email: string | null; area: string | null; note: string | null; created_at: string }
 interface Found { key: string; label: string; sub: string }
 
 const money = (n: number) => `KES ${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -24,6 +25,8 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
   const [pct, setPct] = useState('10');
   const [bq, setBq] = useState('');
   const [bfound, setBfound] = useState<Found[]>([]);
+  const [apps, setApps] = useState<App[]>([]);
+  const [appId, setAppId] = useState<string | null>(null);
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_list_resellers');
@@ -32,11 +35,22 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
     setRows(list);
     setEdit(Object.fromEntries(list.map((r) => [r.id, { pct: String(r.commission_pct), status: r.status }])));
   }
-  useEffect(() => { void load(); }, []);
+  async function loadApps() {
+    const { data } = await supabase.from('reseller_applications').select('id,name,phone,email,area,note,created_at').eq('status', 'pending').order('created_at');
+    setApps((data ?? []) as App[]);
+  }
+  useEffect(() => { void load(); void loadApps(); }, []);
+  function startApproval(a: App) { setAppId(a.id); setAdding(true); setQ(a.name); setPhone(a.phone); setPick(null); setFound([]); window.scrollTo({ top: 0, behavior: 'smooth' }); void searchPeopleFor(a.name); }
+  async function reject(a: App) {
+    if (!window.confirm(`Reject the application from ${a.name}?`)) return;
+    const { error } = await supabase.rpc('admin_decide_reseller_application', { p_id: a.id, p_status: 'rejected', p_reseller: null });
+    if (error) setError(error.message); else await loadApps();
+  }
 
-  async function searchPeople() {
+  async function searchPeople() { await searchPeopleFor(q); }
+  async function searchPeopleFor(text: string) {
     setError(null);
-    const term = q.trim();
+    const term = text.trim();
     if (term.length < 2) { setFound([]); return; }
     const { data, error } = await supabase.from('profiles').select('id,user_id,full_name,phone,role').ilike('full_name', `%${term}%`).is('deleted_at', null).limit(8);
     if (error) { setError(error.message); return; }
@@ -50,6 +64,7 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
     const { error } = await supabase.rpc('admin_create_reseller', { p_user_id: pick.key, p_name: pick.label, p_phone: phone.trim() || null, p_pct: p });
     setBusy(null);
     if (error) { setError(error.message); return; }
+    if (appId) { await supabase.rpc('admin_decide_reseller_application', { p_id: appId, p_status: 'approved', p_reseller: null }); setAppId(null); await loadApps(); }
     setNote(`${pick.label} is now a reseller.`); setAdding(false); setPick(null); setQ(''); setFound([]); setPhone(''); setPct('10');
     await load();
   }
@@ -98,6 +113,26 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
         <Card><div className="text-xs text-slate-400">Owed now</div><div className="text-xl font-semibold">{money(owedTotal)}</div></Card>
         <Card><div className="text-xs text-slate-400">Paid out</div><div className="text-xl font-semibold">{money(rows.reduce((s, r) => s + r.paid, 0))}</div></Card>
       </div>
+
+      {apps.length > 0 && (
+        <Card>
+          <h3 className="font-medium mb-2">Applications waiting ({apps.length})</h3>
+          <ul className="divide-y divide-slate-800">
+            {apps.map((a) => (
+              <li key={a.id} className="py-2.5 space-y-1">
+                <div className="flex items-center justify-between gap-2"><span className="font-medium">{a.name}</span><span className="text-xs text-slate-400">{new Date(a.created_at).toLocaleDateString()}</span></div>
+                <div className="text-xs text-slate-400">{a.phone}{a.email ? ` · ${a.email}` : ''}{a.area ? ` · ${a.area}` : ''}</div>
+                {a.note && <p className="text-sm text-slate-300">{a.note}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => startApproval(a)} className="btn-primary text-sm">Approve</button>
+                  <button onClick={() => void reject(a)} className="btn-secondary text-sm">Reject</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-slate-500 mt-2">To approve, the person needs a ShopOS account. Approve finds them by name so you can make them a reseller.</p>
+        </Card>
+      )}
 
       {adding && (
         <Card>
