@@ -30,6 +30,7 @@ import AppsAndUpdates from './pages/AppsAndUpdates';
 import Monitor from './pages/Monitor';
 import OtherAppsPage from './pages/OtherApps';
 import LessonsPage from './pages/Lessons';
+import ResellersPage from './pages/Resellers';
 import { friendlyError } from './lib/friendlyError';
 
 export default function App() {
@@ -119,7 +120,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', otherapps: 'Other apps', lessons: 'Lessons', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', otherapps: 'Other apps', lessons: 'Lessons', resellers: 'Resellers', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -200,6 +201,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'database' && <DatabasePage supabase={supabase} />}
             {tab === 'otherapps' && <OtherAppsPage supabase={supabase} />}
             {tab === 'lessons' && <LessonsPage supabase={supabase} />}
+            {tab === 'resellers' && <ResellersPage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>
         </main>
