@@ -25,6 +25,10 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
   const [pct, setPct] = useState('10');
   const [bq, setBq] = useState('');
   const [bfound, setBfound] = useState<Found[]>([]);
+  const [mode, setMode] = useState<'new' | 'existing'>('new');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [creds, setCreds] = useState<{ email: string; password: string; code: string; name: string } | null>(null);
   const [apps, setApps] = useState<App[]>([]);
   const [appId, setAppId] = useState<string | null>(null);
 
@@ -40,7 +44,7 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
     setApps((data ?? []) as App[]);
   }
   useEffect(() => { void load(); void loadApps(); }, []);
-  function startApproval(a: App) { setAppId(a.id); setAdding(true); setQ(a.name); setPhone(a.phone); setPick(null); setFound([]); window.scrollTo({ top: 0, behavior: 'smooth' }); void searchPeopleFor(a.name); }
+  function startApproval(a: App) { setAppId(a.id); setAdding(true); setMode('new'); setName(a.name); setEmail(a.email ?? ''); setPhone(a.phone); setPick(null); setFound([]); setCreds(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   async function reject(a: App) {
     if (!window.confirm(`Reject the application from ${a.name}?`)) return;
     const { error } = await supabase.rpc('admin_decide_reseller_application', { p_id: a.id, p_status: 'rejected', p_reseller: null });
@@ -55,6 +59,19 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
     const { data, error } = await supabase.from('profiles').select('id,user_id,full_name,phone,role').ilike('full_name', `%${term}%`).is('deleted_at', null).limit(8);
     if (error) { setError(error.message); return; }
     setFound((data ?? []).map((p: any) => ({ key: p.user_id ?? p.id, label: p.full_name || 'No name', sub: `${p.role ?? ''}${p.phone ? ' · ' + p.phone : ''}` })));
+  }
+  async function createNew() {
+    setBusy('create'); setError(null); setNote(null); setCreds(null);
+    const p = Number(pct);
+    if (!(p >= 0 && p <= 100)) { setError('The commission must be between 0 and 100.'); setBusy(null); return; }
+    const { data, error } = await supabase.functions.invoke('admin-create-reseller', { body: { name, phone, email, pct: p, application_id: appId } });
+    setBusy(null);
+    let msg = (data as any)?.error as string | undefined;
+    if (error && !msg) { try { msg = (await (error as any).context?.json?.())?.error; } catch { /* ignore */ } }
+    if (error || msg || !(data as any)?.password) { setError(msg || 'Could not create the partner. Try again.'); return; }
+    setCreds({ email: (data as any).email, password: (data as any).password, code: (data as any).code, name });
+    setAppId(null); setAdding(false); setName(''); setEmail(''); setPhone(''); setPct('10');
+    await load(); await loadApps();
   }
   async function create() {
     if (!pick) return;
@@ -130,31 +147,66 @@ export default function ResellersPage({ supabase }: { supabase: SupabaseClient }
               </li>
             ))}
           </ul>
-          <p className="text-[11px] text-slate-500 mt-2">To approve, the person needs a ShopOS account. Approve finds them by name so you can make them a reseller.</p>
+          <p className="text-[11px] text-slate-500 mt-2">Approve opens a form with their details filled in. You create their partner sign-in and send them the password.</p>
+        </Card>
+      )}
+
+      {creds && (
+        <Card className="border border-emerald-500/40">
+          <h3 className="font-medium mb-1">{creds.name} can now sign in</h3>
+          <p className="text-xs text-slate-400 mb-2">Send them these details now. The password is shown only once. They sign in at the ShopOS app and can change it with "Forgot password".</p>
+          <div className="text-sm space-y-1">
+            <div>Email: <b>{creds.email}</b></div>
+            <div>Temporary password: <code className="px-2 py-0.5 rounded bg-slate-800">{creds.password}</code></div>
+            <div>Partner code: <b>{creds.code}</b></div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={() => void navigator.clipboard?.writeText(`ShopOS partner account\nSign in: https://shopos-app.vercel.app/login\nEmail: ${creds.email}\nPassword: ${creds.password}\nYour partner code: ${creds.code}`)} className="btn-secondary text-sm inline-flex items-center gap-1.5"><Copy className="w-4 h-4" /> Copy message</button>
+            <button onClick={() => setCreds(null)} className="btn-secondary text-sm">Done</button>
+          </div>
         </Card>
       )}
 
       {adding && (
         <Card>
-          <h3 className="font-medium mb-2">Make someone a reseller</h3>
-          <p className="text-xs text-slate-400 mb-2">They must already have a ShopOS account. Search by their name.</p>
-          <div className="flex gap-2">
-            <input className="input flex-1" placeholder="Search a name" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void searchPeople(); }} />
-            <button onClick={() => void searchPeople()} className="btn-secondary inline-flex items-center gap-1.5 text-sm"><Search className="w-4 h-4" /> Search</button>
+          <h3 className="font-medium mb-2">Add a reseller</h3>
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => setMode('new')} className={`text-sm px-3 py-1.5 rounded-full border ${mode === 'new' ? 'bg-field-600 border-field-600 text-white' : 'border-slate-700 text-slate-300'}`}>New partner account</button>
+            <button onClick={() => setMode('existing')} className={`text-sm px-3 py-1.5 rounded-full border ${mode === 'existing' ? 'bg-field-600 border-field-600 text-white' : 'border-slate-700 text-slate-300'}`}>Existing ShopOS account</button>
           </div>
-          {found.length > 0 && !pick && (
-            <ul className="mt-2 divide-y divide-slate-800 border border-slate-800 rounded-card">
-              {found.map((f) => <li key={f.key}><button onClick={() => { setPick(f); setFound([]); }} className="w-full text-left px-3 py-2 hover:bg-slate-800/60"><div className="text-sm font-medium">{f.label}</div><div className="text-xs text-slate-400">{f.sub}</div></button></li>)}
-            </ul>
-          )}
-          {pick && (
-            <div className="mt-3 space-y-2">
-              <div className="text-sm">Selected: <b>{pick.label}</b> <button className="text-xs text-field-500 ml-1" onClick={() => setPick(null)}>change</button></div>
+          {mode === 'new' ? (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-400">Creates their own sign-in. They do not need a shop. They sign in with the email below and see only their partner dashboard.</p>
               <div className="grid grid-cols-2 gap-2">
+                <input className="input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
                 <input className="input" placeholder="Phone (for payouts)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <input className="input" type="email" placeholder="Email (their sign-in)" value={email} onChange={(e) => setEmail(e.target.value)} />
                 <input className="input" type="number" min={0} max={100} placeholder="Commission %" value={pct} onChange={(e) => setPct(e.target.value)} />
               </div>
-              <button onClick={() => void create()} disabled={busy === 'create'} className="btn-primary text-sm disabled:opacity-60">{busy === 'create' ? 'Saving…' : 'Create reseller'}</button>
+              <button onClick={() => void createNew()} disabled={busy === 'create' || !name.trim() || !email.trim()} className="btn-primary text-sm disabled:opacity-60">{busy === 'create' ? 'Creating…' : 'Create partner account'}</button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-slate-400 mb-2">For someone who already uses ShopOS. Search by their name.</p>
+              <div className="flex gap-2">
+                <input className="input flex-1" placeholder="Search a name" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void searchPeople(); }} />
+                <button onClick={() => void searchPeople()} className="btn-secondary inline-flex items-center gap-1.5 text-sm"><Search className="w-4 h-4" /> Search</button>
+              </div>
+              {found.length > 0 && !pick && (
+                <ul className="mt-2 divide-y divide-slate-800 border border-slate-800 rounded-card">
+                  {found.map((f) => <li key={f.key}><button onClick={() => { setPick(f); setFound([]); }} className="w-full text-left px-3 py-2 hover:bg-slate-800/60"><div className="text-sm font-medium">{f.label}</div><div className="text-xs text-slate-400">{f.sub}</div></button></li>)}
+                </ul>
+              )}
+              {pick && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-sm">Selected: <b>{pick.label}</b> <button className="text-xs text-field-500 ml-1" onClick={() => setPick(null)}>change</button></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="input" placeholder="Phone (for payouts)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <input className="input" type="number" min={0} max={100} placeholder="Commission %" value={pct} onChange={(e) => setPct(e.target.value)} />
+                  </div>
+                  <button onClick={() => void create()} disabled={busy === 'create'} className="btn-primary text-sm disabled:opacity-60">{busy === 'create' ? 'Saving…' : 'Create reseller'}</button>
+                </div>
+              )}
             </div>
           )}
         </Card>
