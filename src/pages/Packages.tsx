@@ -7,7 +7,7 @@ import { friendlyError } from '../lib/friendlyError';
 import { useBadges, refreshBadges, BadgeDot } from '../lib/badges';
 
 interface Service { key: string; label: string; description: string | null }
-interface Pkg { id: string; name: string; tagline: string | null; description: string | null; price: number; currency: string; validity_months: number | null; validity_days: number | null; features: string[]; service_keys: string[]; highlighted: boolean; is_public: boolean; is_active: boolean; sort: number }
+interface Pkg { id: string; name: string; tagline: string | null; description: string | null; price: number; yearly_price?: number | null; currency: string; validity_months: number | null; validity_days: number | null; features: string[]; service_keys: string[]; highlighted: boolean; is_public: boolean; is_active: boolean; sort: number }
 interface BizRow { business_id: string; name: string; status: string; package_id: string | null; package_name: string | null; price: number | null; currency: string | null; ends_at: string | null; days_left: number | null; state: string; pending_request: boolean }
 interface Offer { id: string; name: string; message: string | null; starts_at: string; ends_at: string; service_keys: string[]; opens_app: boolean; ended_early_at: string | null }
 interface Req { id: string; business_id: string; business_name: string; owner_email: string | null; package_id: string | null; package_name: string | null; kind: string; note: string | null; status: string; admin_note: string | null; created_at: string; current_ends_at: string | null }
@@ -126,6 +126,7 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
   const [edit, setEdit] = useState<Pkg | null>(null);
   const [view, setView] = useState<Pkg | null>(null);
   const [priceTxt, setPriceTxt] = useState('');
+  const [yearTxt, setYearTxt] = useState('');
   const [valTxt, setValTxt] = useState('');
   const [counts, setCounts] = useState<Record<string, number>>({});
   useEffect(() => { void supabase.rpc('admin_package_stats').then(({ data }) => { const m: Record<string, number> = {}; for (const r of ((data as { packages?: { id: string; businesses_now: number }[] } | null)?.packages ?? [])) m[r.id] = r.businesses_now; setCounts(m); }); }, [supabase, pkgs]);
@@ -135,19 +136,21 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
 
   function open(p: Pkg) {
     setEdit({ ...p }); setFeatText((p.features ?? []).join('\n')); setErr(null);
-    setPriceTxt(p.id ? String(p.price) : ''); setValTxt(p.validity_days ? String(p.validity_days) : p.validity_months !== null ? String(p.validity_months) : '');
+    setPriceTxt(p.id ? String(p.price) : ''); setYearTxt(p.yearly_price ? String(p.yearly_price) : ''); setValTxt(p.validity_days ? String(p.validity_days) : p.validity_months !== null ? String(p.validity_months) : '');
   }
   async function save() {
     if (!edit) return;
     if (edit.name.trim().length < 2) { setErr('Give the package a name.'); return; }
     const price = priceTxt.trim() === '' ? 0 : Number(priceTxt);
     if (!Number.isFinite(price) || price < 0) { setErr('Enter the cost as a number, for example 1500.'); return; }
+    const yearly = yearTxt.trim() === '' ? null : Number(yearTxt);
+    if (yearly !== null && (!Number.isFinite(yearly) || yearly <= 0)) { setErr('Enter the 1-year price as a number, or leave it empty.'); return; }
     const life = !edit.validity_days && edit.validity_months === null;
     const n = parseInt(valTxt, 10);
     if (!life && edit.validity_days && !(n >= 1 && n <= 3650)) { setErr('Enter how many days it lasts (1 to 3650).'); return; }
     if (!life && !edit.validity_days && !(n >= 1 && n <= 120)) { setErr('Enter how many months it lasts (1 to 120).'); return; }
     setBusy('save'); setErr(null);
-    const pay = { ...edit, price, validity_days: life ? null : edit.validity_days ? n : null, validity_months: life ? null : edit.validity_days ? null : n };
+    const pay = { ...edit, price, yearly_price: yearly, validity_days: life ? null : edit.validity_days ? n : null, validity_months: life ? null : edit.validity_days ? null : n };
     const { error } = await supabase.rpc('admin_save_package', { p: { ...pay, id: edit.id || null, features: featText.split('\n').map((s) => s.trim()).filter(Boolean) } });
     if (error) setErr(friendlyError(error, 'Could not save this package.')); else { setEdit(null); setView(null); await reload(); }
     setBusy(null);
@@ -194,6 +197,7 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
             <div className="flex items-center justify-between"><p className="font-medium">{edit.id ? 'Edit package' : 'New package'}</p><button onClick={() => setEdit(null)} aria-label="Close" className="p-1 text-slate-400"><X className="w-5 h-5" /></button></div>
             <label className="block"><span className="block text-xs text-slate-400 mb-1">Name</span><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} maxLength={60} /></label>
             <label className="block"><span className="block text-xs text-slate-400 mb-1">Short line (shown under the name)</span><input className="input" value={edit.tagline ?? ''} onChange={(e) => setEdit({ ...edit, tagline: e.target.value })} maxLength={140} /></label>
+            <label className="block"><span className="block text-xs text-slate-400 mb-1">Price for 1 year ({edit.currency}), optional. Leave empty if there is no yearly option.</span><input className="input" type="text" inputMode="decimal" placeholder="e.g. 10000" value={yearTxt} onChange={(e) => { if (/^\d*\.?\d{0,2}$/.test(e.target.value)) setYearTxt(e.target.value); }} /></label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block"><span className="block text-xs text-slate-400 mb-1">Cost ({edit.currency})</span><input className="input" type="text" inputMode="decimal" placeholder="0" value={priceTxt} onChange={(e) => { if (/^\d*\.?\d{0,2}$/.test(e.target.value)) setPriceTxt(e.target.value); }} /></label>
               <div className="block"><span className="block text-xs text-slate-400 mb-1">Valid for</span>

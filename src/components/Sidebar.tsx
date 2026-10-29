@@ -1,14 +1,15 @@
-import { Handshake, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Trash2, Package, Palette, LayoutGrid, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette } from 'lucide-react';
 
 import { BadgeDot, badgeFor, type Badges } from '../lib/badges';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'otherapps' | 'lessons' | 'resellers';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
   ['requests', 'Owner Requests', Users],
   ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
+  ['mpesa', 'M-Pesa', Wallet],
   ['packages', 'Packages', Package],
   ['businesstypes', 'Business Types', Palette],
   ['softdelete', 'Soft Delete', Trash2],
@@ -17,10 +18,8 @@ export const TABS: [Tab, string, any][] = [
   ['reviews', 'Reviews', Star],
   ['permissions', 'Role Defaults', ShieldCheck],
   ['apps', 'Apps & Updates', RefreshCw],
-  ['otherapps', 'Other apps', LayoutGrid],
-  ['lessons', 'Lessons', BookOpen],
-  ['resellers', 'Resellers', Handshake],
   ['database', 'Database', Database],
+  ['assistant', 'Assistant', Bot],
   ['monitor', 'Monitor', Terminal],
   ['audit', 'Audit Logs', ScrollText],
   ['support', 'Support', LifeBuoy],

@@ -47,6 +47,7 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
 
   return (
     <div className="max-w-sm space-y-6">
+      <PublicFiguresCard supabase={supabase} />
       <ChangePasswordCard supabase={supabase} />
       <div>
       <h2 className="font-display font-semibold text-lg mb-1">Platform settings</h2>
@@ -127,6 +128,40 @@ function ChangePasswordCard({ supabase }: { supabase: SupabaseClient }) {
         >
           {busy ? 'Changing…' : 'Change password'}
         </button>
+      </Card>
+    </div>
+  );
+}
+
+interface PubSettings { show_businesses: boolean; show_sales: boolean; show_transactions: boolean; show_mpesa: boolean }
+function PublicFiguresCard({ supabase }: { supabase: SupabaseClient }) {
+  const [v, setV] = useState<PubSettings | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { void supabase.rpc('admin_get_public_stats_settings').then(({ data }) => { if (data) setV(data as PubSettings); }); }, []);
+  async function change(next: PubSettings) {
+    setV(next); setMsg(null);
+    const { error } = await supabase.rpc('admin_set_public_stats_settings', { p_businesses: next.show_businesses, p_sales: next.show_sales, p_transactions: next.show_transactions, p_mpesa: next.show_mpesa });
+    setMsg(error ? 'Could not save. Please try again.' : 'Saved.');
+  }
+  if (!v) return null;
+  const rows: [keyof PubSettings, string, string][] = [
+    ['show_businesses', 'Number of businesses', 'How many active businesses use ShopOS.'],
+    ['show_sales', 'Sales recorded', 'Total number of sales rung up on the platform.'],
+    ['show_transactions', 'Receipts this month', 'How many sales were made this calendar month.'],
+    ['show_mpesa', 'M-Pesa payments received', 'How many M-Pesa payments ShopOS has confirmed.'],
+  ];
+  return (
+    <div>
+      <h2 className="font-display font-semibold text-lg mb-1">Figures on the landing page</h2>
+      <p className="text-xs text-slate-400 mb-3">Only counts are ever shown. No business names, no money amounts and no customer details. Switch any figure off here.</p>
+      <Card className="space-y-2">
+        {rows.map(([k, label, hint]) => (
+          <label key={k} className="flex items-start gap-3 py-1 cursor-pointer">
+            <input type="checkbox" className="mt-1" checked={v[k]} onChange={(e) => void change({ ...v, [k]: e.target.checked })} />
+            <span><span className="block text-sm font-medium">{label}</span><span className="block text-xs text-slate-400">{hint}</span></span>
+          </label>
+        ))}
+        {msg && <p className="text-xs text-slate-400" role="status">{msg}</p>}
       </Card>
     </div>
   );
