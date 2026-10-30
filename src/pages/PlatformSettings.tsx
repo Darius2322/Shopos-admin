@@ -16,6 +16,7 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [sub, setSub] = useState<'support' | 'maintenance' | 'landing' | 'security'>('support');
 
   async function load() {
     setLoading(true);
@@ -46,11 +47,16 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
   if (loading || !settings) return <Skeleton />;
 
   return (
-    <div className="max-w-sm space-y-6">
-      <MaintenanceCard supabase={supabase} />
-      <PublicFiguresCard supabase={supabase} />
-      <ChangePasswordCard supabase={supabase} />
-      <div>
+    <div className="max-w-md space-y-5">
+      <div role="tablist" aria-label="Platform settings" className="flex gap-1.5 overflow-x-auto pb-1">
+        {([['support', 'Support contacts'], ['maintenance', 'Maintenance'], ['landing', 'Landing page'], ['security', 'My account']] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`whitespace-nowrap text-xs font-medium rounded-full px-3 py-1.5 border ${sub === k ? 'bg-field-600 border-field-600 text-white' : 'border-slate-700 text-slate-400 hover:text-ink'}`}>{l}</button>
+        ))}
+      </div>
+      {sub === 'maintenance' && <MaintenanceCard supabase={supabase} />}
+      {sub === 'landing' && <PublicFiguresCard supabase={supabase} />}
+      {sub === 'security' && <ChangePasswordCard supabase={supabase} />}
+      {sub === 'support' && <div>
       <h2 className="font-display font-semibold text-lg mb-1">Platform settings</h2>
       <p className="text-xs text-slate-400 mb-3">
         Shown on the sign-in, register, and check-status screens of the main app — so an applicant stuck waiting has a way to reach you.
@@ -73,7 +79,7 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
           <Save className="w-4 h-4" /> {saving ? 'Saving…' : saved ? 'Saved' : 'Save settings'}
         </button>
       </Card>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -190,7 +196,7 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
     const { error } = await supabase.rpc('admin_set_maintenance', { p_closed: nextClosed, p_parts: parts, p_message: message, p_back_at: backAt ? new Date(backAt).toISOString() : null });
     setBusy(false);
     if (error) { setMsg('Could not save. Please try again.'); return; }
-    setClosed(nextClosed); setMsg(nextClosed ? 'The whole app is now closed for everyone.' : parts.length ? 'Saved. The ticked parts are closed.' : 'Saved. The app is open.');
+    window.dispatchEvent(new Event('shopos-status')); setClosed(nextClosed); setMsg(nextClosed ? 'The whole app is now closed for everyone.' : parts.length ? 'Saved. The ticked parts are closed.' : 'Saved. The app is open.');
   }
   if (!loaded) return null;
   return (

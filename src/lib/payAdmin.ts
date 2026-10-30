@@ -29,13 +29,13 @@ export const approveSource = (sourceId: string) => call({ action: 'approve', sou
 export const defaultsStatus = () => call({ action: 'defaults_status' });
 export const defaultsSave = (i: { env: 'sandbox' | 'production'; consumerKey: string; consumerSecret: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'defaults_save', ...i });
 export const disconnect = (sourceId: string) => call({ action: 'disconnect', sourceId });
-export interface PlatformPay { enabled: boolean; kind: 'mpesa_till' | 'mpesa_paybill' | null; number: string | null; displayName: string | null; env: 'sandbox' | 'production' | null; hasKeys: boolean; hasPasskey: boolean; headOfficeNumber: string | null }
+export interface PlatformPay { enabled: boolean; kind: 'mpesa_till' | 'mpesa_paybill' | null; number: string | null; displayName: string | null; accountNumber: string | null; env: 'sandbox' | 'production' | null; hasKeys: boolean; hasPasskey: boolean; headOfficeNumber: string | null }
 export async function platformStatus(): Promise<PlatformPay | { error: string }> {
   const r = await call({ action: 'platform_status' });
   if (!r.ok) return { error: r.error ?? 'Could not load.' };
   return r as unknown as PlatformPay;
 }
-export const platformSave = (i: { enabled: boolean; kind: string; number: string; displayName?: string; env?: string; consumerKey?: string; consumerSecret?: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'platform_save', ...i });
+export const platformSave = (i: { enabled: boolean; kind: string; number: string; displayName?: string; accountNumber?: string; env?: string; consumerKey?: string; consumerSecret?: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'platform_save', ...i });
 
 export async function askAssistant(question: string, history: { role: 'me' | 'ai'; text: string }[]): Promise<{ text?: string; error?: string }> {
   if (!supabase) return { error: 'Not connected.' };

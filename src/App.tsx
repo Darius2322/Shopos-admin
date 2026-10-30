@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Menu } from 'lucide-react';
+import { Bot, Menu } from 'lucide-react';
+import { AppStatusPill } from './components/AppStatusPill';
 import { supabase } from './lib/supabase';
 import { Centered } from './components/ui';
 import Packages from './pages/Packages';
@@ -148,21 +149,18 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
       <Sidebar tab={tab === 'installers' || tab === 'releases' ? 'apps' : tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col h-screen">
-        <header className="shrink-0 border-b border-slate-700 bg-paper">
-          <div className="flex items-center gap-3 px-4 py-3 lg:hidden">
-            <button aria-label="Open menu" onClick={() => setMobileNavOpen(true)} className="relative p-1.5 -ml-1.5 text-slate-400 hover:text-ink">
+        <header className="shrink-0 sticky top-0 z-30 border-b border-slate-700 bg-paper">
+          {/* One sticky bar, same on phone and desktop: menu, main-app status, assistant, search, theme, notifications. */}
+          <div className="flex items-center gap-2 px-3 py-2">
+            <button aria-label="Open menu" onClick={() => setMobileNavOpen(true)} className="relative p-1.5 text-slate-400 hover:text-ink lg:hidden shrink-0">
               <Menu className="w-5 h-5" />
               {Object.entries(badges).some(([k, v]) => k !== 'packages_expiring' && v > 0) && <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rust-500" aria-label="New items" />}
             </button>
-            <span className="font-display font-semibold text-sm">{TAB_LABELS[tab]}</span>
-          </div>
-
-          {/* This utility bar (theme / notifications / search) is rendered
-              once, identically on mobile and desktop, so it's never the
-              thing that goes missing when the viewport shrinks. */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 lg:border-t-0">
-            <GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />
-            <div className="flex items-center gap-1 ml-auto">
+            <span className="hidden lg:inline font-display font-semibold text-sm shrink-0 mr-1">{TAB_LABELS[tab]}</span>
+            <AppStatusPill supabase={supabase} onOpen={() => selectTab('settings')} />
+            <button aria-label="AI assistant" title="AI assistant" onClick={() => selectTab('assistant')} className="p-1.5 text-slate-400 hover:text-ink shrink-0"><Bot className="w-5 h-5" /></button>
+            <div className="flex-1 min-w-0"><GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} /></div>
+            <div className="flex items-center gap-0.5 shrink-0">
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
               <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />
             </div>

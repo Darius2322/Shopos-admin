@@ -218,7 +218,7 @@ function PlatformNumber() {
   const [st, setSt] = useState<pay.PlatformPay | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [kind, setKind] = useState<'mpesa_till' | 'mpesa_paybill'>('mpesa_till');
-  const [number, setNumber] = useState(''); const [name, setName] = useState('');
+  const [number, setNumber] = useState(''); const [name, setName] = useState(''); const [account, setAccount] = useState('');
   const [env, setEnv] = useState<'sandbox' | 'production'>('production');
   const [key, setKey] = useState(''); const [secret, setSecret] = useState(''); const [passkey, setPasskey] = useState(''); const [head, setHead] = useState('');
   const [enabled, setEnabled] = useState(false);
@@ -226,12 +226,12 @@ function PlatformNumber() {
   async function load() {
     const r = await pay.platformStatus();
     if ('error' in r) { setLoadErr(r.error); return; }
-    setSt(r); if (r.kind) setKind(r.kind); if (r.number) setNumber(r.number); if (r.displayName) setName(r.displayName); if (r.env) setEnv(r.env); if (r.headOfficeNumber) setHead(r.headOfficeNumber); setEnabled(r.enabled);
+    setSt(r); if (r.kind) setKind(r.kind); if (r.number) setNumber(r.number); if (r.displayName) setName(r.displayName); if (r.accountNumber) setAccount(r.accountNumber); if (r.env) setEnv(r.env); if (r.headOfficeNumber) setHead(r.headOfficeNumber); setEnabled(r.enabled);
   }
   useEffect(() => { void load(); }, []);
   async function save() {
     setErr(null); setOk(false); setBusy(true);
-    const r = await pay.platformSave({ enabled, kind, number, displayName: name, env, consumerKey: key || undefined, consumerSecret: secret || undefined, passkey: passkey || undefined, headOfficeNumber: head || undefined });
+    const r = await pay.platformSave({ enabled, kind, number, displayName: name, accountNumber: account, env, consumerKey: key || undefined, consumerSecret: secret || undefined, passkey: passkey || undefined, headOfficeNumber: head || undefined });
     setBusy(false);
     if (!r.ok) { setErr(pay.why(r)); return; }
     setKey(''); setSecret(''); setPasskey(''); setOk(true); await load();
@@ -246,6 +246,7 @@ function PlatformNumber() {
           <Lbl t="Type"><select className="input" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}><option value="mpesa_till">Till (Buy Goods)</option><option value="mpesa_paybill">Paybill</option></select></Lbl>
           <Lbl t="Number"><input className="input tnum" inputMode="numeric" value={number} onChange={(e) => setNumber(e.target.value.replace(/\D/g, ''))} placeholder="5 to 10 digits" /></Lbl>
         </div>
+        {kind === 'mpesa_paybill' && <Lbl t="Account number (what customers pay to)"><input className="input" value={account} onChange={(e) => setAccount(e.target.value.replace(/[^A-Za-z0-9 ._-]/g, '').slice(0, 20))} placeholder="e.g. SHOPOS" /></Lbl>}
         <Lbl t="Name shown to the customer (optional)"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Lbl>
         <Lbl t="Environment"><select className="input" value={env} onChange={(e) => setEnv(e.target.value as typeof env)}><option value="sandbox">Test (sandbox)</option><option value="production">Live (real money)</option></select></Lbl>
         <Lbl t="Consumer key"><input className="input" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={st?.hasKeys ? 'Saved. Leave empty to keep it.' : ''} /></Lbl>
@@ -255,7 +256,7 @@ function PlatformNumber() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Let owners pay for packages by M-Pesa</label>
         <ErrorText>{err}</ErrorText>
         {ok && <p className="text-sm text-field-600" role="status">Saved.</p>}
-        <button onClick={save} disabled={busy || !number} className="btn-primary w-full inline-flex items-center justify-center gap-1.5">{busy && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
+        <button onClick={save} disabled={busy || !number || (kind === 'mpesa_paybill' && !account.trim())} className="btn-primary w-full inline-flex items-center justify-center gap-1.5">{busy && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
       </Card>
     </div>
   );
