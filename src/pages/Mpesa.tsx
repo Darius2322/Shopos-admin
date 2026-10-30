@@ -99,7 +99,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
                 ? <button onClick={() => void act(r, 'enable')} disabled={busy === r.source_id} className="btn-primary text-xs !py-1.5">Switch on</button>
                 : <button onClick={() => void act(r, 'disable')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Switch off</button>)}
               {r.kind !== 'mpesa_pochi' && <button onClick={() => setSetup(r)} className="btn-secondary text-xs !py-1.5">{r.has_keys ? 'Replace keys for this shop' : 'Own keys for this shop'}</button>}
-              {r.mode === 'daraja' && <button onClick={() => void act(r, 'c2b') disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Link incoming payments</button>}
+              {r.mode === 'daraja' && <button onClick={() => void act(r, 'c2b')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Link incoming payments</button>}
               {r.mode === 'daraja' && <button onClick={() => setPayoutFor(r)} className="btn-secondary text-xs !py-1.5">Automatic refunds</button>}
               {r.daraja_request === 'requested' && <button onClick={() => void act(r, 'reject')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Reject</button>}
               {r.daraja_request === 'rejected' && <button onClick={() => void act(r, 'reset')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Clear rejection</button>}
