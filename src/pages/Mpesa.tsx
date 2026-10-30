@@ -8,7 +8,7 @@ import * as pay from '../lib/payAdmin';
 interface Row {
   source_id: string; business_id: string; business_name: string; label: string; kind: string; number: string; mode: string; status: string;
   daraja_request: string; daraja_note: string | null; env: string | null; has_keys: boolean; c2b_registered: boolean; has_payout: boolean;
-  tx_count: number; tx_total: number; last_tx: string | null;
+  tx_count: number; tx_total: number; last_tx: string | null; account_number: string | null; admin_disabled: boolean;
 }
 interface PkgPay { id: string; business_id: string; amount: number; period: string; status: string; receipt: string | null; payer_name: string; created_at: string; applied_at: string | null }
 const KIND: Record<string, string> = { mpesa_till: 'Till', mpesa_paybill: 'Paybill', mpesa_pochi: 'Pochi la Biashara' };
@@ -47,18 +47,21 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   }
   useEffect(() => { void load(); }, []);
 
-  async function act(r: Row, what: 'reject' | 'reset' | 'c2b' | 'off') {
+  async function act(r: Row, what: 'reject' | 'reset' | 'c2b' | 'off' | 'approve' | 'disable' | 'enable') {
     setErr(null); setMsg(null);
     if (what === 'off' && !window.confirm(`Disconnect ${r.business_name} from Safaricom? Their keys are deleted.`)) return;
     let note: string | null = null;
     if (what === 'reject') { note = window.prompt('Short reason to show the owner (optional):') ?? ''; }
     setBusy(r.source_id);
-    if (what === 'reject' || what === 'reset') {
+    if (what === 'reject' || what === 'reset' || what === 'disable' || what === 'enable') {
       const { error } = await supabase.rpc('admin_mpesa_decide', { p_source_id: r.source_id, p_decision: what, p_note: note });
-      if (error) setErr(friendlyError(error, 'Could not save.'));
+      if (error) setErr(friendlyError(error, 'Could not save.')); else setMsg(what === 'disable' ? `M-Pesa switched off for ${r.business_name}.` : what === 'enable' ? `M-Pesa switched on for ${r.business_name}.` : 'Saved.');
+    } else if (what === 'approve') {
+      const res = await pay.approveSource(r.source_id);
+      if (!res.ok) setErr(pay.why(res)); else setMsg(`Approved. M-Pesa now works for ${r.business_name}${res.shared ? ' using the shared Safaricom keys' : ''}.`);
     } else {
       const res = what === 'c2b' ? await pay.registerIncoming(r.source_id) : await pay.disconnect(r.source_id);
-      if (!res.ok) setErr(res.error ?? 'Failed.'); else setMsg(what === 'c2b' ? 'Incoming payments linked.' : 'Disconnected.');
+      if (!res.ok) setErr(pay.why(res)); else setMsg(what === 'c2b' ? 'Incoming payments linked.' : 'Disconnected.');
     }
     setBusy(null); await load();
   }
@@ -68,10 +71,12 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
     <div className="space-y-6">
       <div>
         <h2 className="font-display font-semibold text-lg">M-Pesa</h2>
-        <p className="text-xs text-slate-400">Each business asks to be connected from its own app. You enter its Safaricom keys here. Keys are encrypted and can never be read back, not even by you.</p>
+        <p className="text-xs text-slate-400">A business asks to be connected from its own app. M-Pesa does not work for it until you press Approve. Save the Safaricom keys once below and every approved shop reuses them. Keys are encrypted and can never be read back, not even by you.</p>
       </div>
       <ErrorText>{err}</ErrorText>
       {msg && <p className="text-sm text-field-600" role="status">{msg}</p>}
+
+      <SharedKeys />
 
       <PlatformNumber />
 
@@ -82,18 +87,22 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{r.business_name} <span className="text-slate-400 font-normal">· {r.label}</span></p>
-                <p className="text-xs text-slate-400 tnum">{KIND[r.kind] ?? r.kind} {r.number} · {r.status === 'disabled' ? 'turned off by the owner' : r.mode === 'daraja' ? `connected (${r.env === 'production' ? 'live' : 'test'})` : r.daraja_request === 'requested' ? 'waiting for you' : r.daraja_request === 'rejected' ? 'rejected' : 'not connected'}</p>
-                {r.mode === 'daraja' && <p className="text-xs text-slate-500">{r.c2b_registered ? 'Incoming payments linked' : 'Incoming payments not linked'} · {r.has_payout ? 'automatic refunds on' : 'automatic refunds off'} · {r.tx_count} payments</p>}
+                <p className="text-xs text-slate-400 tnum">{KIND[r.kind] ?? r.kind} {r.number}{r.kind === 'mpesa_paybill' && r.account_number ? ` · Account ${r.account_number}` : ''} · {r.admin_disabled ? 'switched off by you' : r.status === 'disabled' ? 'turned off by the owner' : r.mode === 'daraja' && r.daraja_request === 'approved' ? `approved and on (${r.env === 'production' ? 'live' : 'test'})` : r.daraja_request === 'requested' ? 'waiting for your approval' : r.daraja_request === 'rejected' ? 'rejected' : 'not approved'}</p>
+                {r.has_keys && <p className="text-xs text-slate-500">{r.c2b_registered ? 'Incoming payments linked' : 'Incoming payments not linked'} · {r.has_payout ? 'automatic refunds on' : 'automatic refunds off'} · {r.tx_count} payments</p>}
                 {r.daraja_note && <p className="text-xs text-slate-500">Note: {r.daraja_note}</p>}
               </div>
               {r.daraja_request === 'requested' && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 whitespace-nowrap">new request</span>}
             </div>
             <div className="flex flex-wrap gap-2">
-              {r.kind !== 'mpesa_pochi' && <button onClick={() => setSetup(r)} className="btn-primary text-xs !py-1.5">{r.mode === 'daraja' ? 'Update keys' : 'Enter keys'}</button>}
-              {r.mode === 'daraja' && <button onClick={() => void act(r, 'c2b')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Link incoming payments</button>}
+              {r.kind !== 'mpesa_pochi' && !(r.mode === 'daraja' && r.daraja_request === 'approved') && <button onClick={() => void act(r, 'approve')} disabled={busy === r.source_id} className="btn-primary text-xs !py-1.5">Approve</button>}
+              {r.mode === 'daraja' && r.daraja_request === 'approved' && (r.admin_disabled
+                ? <button onClick={() => void act(r, 'enable')} disabled={busy === r.source_id} className="btn-primary text-xs !py-1.5">Switch on</button>
+                : <button onClick={() => void act(r, 'disable')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Switch off</button>)}
+              {r.kind !== 'mpesa_pochi' && <button onClick={() => setSetup(r)} className="btn-secondary text-xs !py-1.5">{r.has_keys ? 'Replace keys for this shop' : 'Own keys for this shop'}</button>}
+              {r.mode === 'daraja' && <button onClick={() => void act(r, 'c2b') disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Link incoming payments</button>}
               {r.mode === 'daraja' && <button onClick={() => setPayoutFor(r)} className="btn-secondary text-xs !py-1.5">Automatic refunds</button>}
-              {r.mode !== 'daraja' && r.daraja_request === 'requested' && <button onClick={() => void act(r, 'reject')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Reject</button>}
-              {r.mode !== 'daraja' && r.daraja_request === 'rejected' && <button onClick={() => void act(r, 'reset')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Clear rejection</button>}
+              {r.daraja_request === 'requested' && <button onClick={() => void act(r, 'reject')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Reject</button>}
+              {r.daraja_request === 'rejected' && <button onClick={() => void act(r, 'reset')} disabled={busy === r.source_id} className="btn-secondary text-xs !py-1.5">Clear rejection</button>}
               {r.mode === 'daraja' && <button onClick={() => void act(r, 'off')} disabled={busy === r.source_id} className="text-xs text-rust-500 underline px-2">Disconnect</button>}
             </div>
           </Card>
@@ -115,7 +124,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
         )}
       </div>
 
-      {setup && <KeysSheet row={setup} onClose={() => setSetup(null)} onDone={async () => { setSetup(null); setMsg('Connected. The owner can now send payment prompts. Remember to link incoming payments.'); await load(); }} />}
+      {setup && <KeysSheet row={setup} onClose={() => setSetup(null)} onDone={async () => { setSetup(null); setMsg('Keys saved for this shop. Press Approve to switch M-Pesa on.'); await load(); }} />}
       {payoutFor && <PayoutSheet row={payoutFor} onClose={() => setPayoutFor(null)} onDone={async () => { setPayoutFor(null); setMsg('Automatic refunds are on for this number.'); await load(); }} />}
     </div>
   );
@@ -129,7 +138,7 @@ function KeysSheet({ row, onClose, onDone }: { row: Row; onClose: () => void; on
     setErr(null); setBusy(true);
     const r = await pay.saveKeys({ sourceId: row.source_id, env, consumerKey: key, consumerSecret: secret, passkey: passkey || undefined, headOfficeNumber: head || undefined });
     setBusy(false);
-    if (!r.ok) { setErr(r.error ?? 'Could not save.'); return; }
+    if (!r.ok) { setErr(pay.why(r)); return; }
     await onDone();
   }
   return (
@@ -153,7 +162,7 @@ function PayoutSheet({ row, onClose, onDone }: { row: Row; onClose: () => void; 
     setErr(null); setBusy(true);
     const r = await pay.savePayout(row.source_id, initiator, cred);
     setBusy(false);
-    if (!r.ok) { setErr(r.error ?? 'Could not save.'); return; }
+    if (!r.ok) { setErr(pay.why(r)); return; }
     await onDone();
   }
   return (
@@ -164,6 +173,43 @@ function PayoutSheet({ row, onClose, onDone }: { row: Row; onClose: () => void; 
       <ErrorText>{err}</ErrorText>
       <button onClick={save} disabled={busy || !initiator || !cred} className="btn-primary w-full inline-flex items-center justify-center gap-1.5">{busy && <Loader2 className="w-4 h-4 animate-spin" />} Turn on automatic refunds</button>
     </Sheet>
+  );
+}
+
+/** Configure once: the Safaricom keys every approved shop reuses, so nothing is typed again when a new business joins. */
+function SharedKeys() {
+  const [st, setSt] = useState<{ saved: boolean; env: string | null; hasPasskey: boolean; headOfficeNumber: string | null } | null>(null);
+  const [env, setEnv] = useState<'sandbox' | 'production'>('production');
+  const [key, setKey] = useState(''); const [secret, setSecret] = useState(''); const [passkey, setPasskey] = useState(''); const [head, setHead] = useState('');
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null); const [ok, setOk] = useState(false);
+  async function load() {
+    const r = await pay.defaultsStatus();
+    if (r.ok) { setSt({ saved: !!r.saved, env: (r.env as string) ?? null, hasPasskey: !!r.hasPasskey, headOfficeNumber: (r.headOfficeNumber as string) ?? null }); if (r.env) setEnv(r.env as 'sandbox' | 'production'); if (r.headOfficeNumber) setHead(String(r.headOfficeNumber)); }
+  }
+  useEffect(() => { void load(); }, []);
+  async function save() {
+    setErr(null); setOk(false); setBusy(true);
+    const r = await pay.defaultsSave({ env, consumerKey: key, consumerSecret: secret, passkey: passkey || undefined, headOfficeNumber: head || undefined });
+    setBusy(false);
+    if (!r.ok) { setErr(pay.why(r)); return; }
+    setKey(''); setSecret(''); setPasskey(''); setOk(true); await load();
+  }
+  return (
+    <div className="space-y-2">
+      <h3 className="font-medium text-sm">Safaricom keys for all shops (set once)</h3>
+      <Card className="space-y-3">
+        <p className="text-xs text-slate-400">Save these once. When you press Approve on a new shop that has no keys of its own, it reuses these, still encrypted, and you type nothing more. Use this when your Daraja app and head office number cover the shops. A shop whose till belongs to a different Safaricom account needs its own keys ("Own keys for this shop"). Customers who pay by hand are only matched automatically for a shop that has linked its own incoming payments.</p>
+        <p className="text-xs text-slate-500">{st?.saved ? `Saved (${st.env === 'production' ? 'live' : 'test'}${st.hasPasskey ? ', passkey saved' : ', no passkey yet'}${st.headOfficeNumber ? `, head office ${st.headOfficeNumber}` : ''}).` : 'Nothing saved yet.'}</p>
+        <Lbl t="Environment"><select className="input" value={env} onChange={(e) => setEnv(e.target.value as typeof env)}><option value="sandbox">Test (sandbox)</option><option value="production">Live (real money)</option></select></Lbl>
+        <Lbl t="Consumer key"><input className="input" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} /></Lbl>
+        <Lbl t="Consumer secret"><input className="input" type="password" autoComplete="new-password" value={secret} onChange={(e) => setSecret(e.target.value)} /></Lbl>
+        <Lbl t="Lipa na M-Pesa passkey"><input className="input" type="password" autoComplete="new-password" value={passkey} onChange={(e) => setPasskey(e.target.value)} placeholder="Needed for payment prompts" /></Lbl>
+        <Lbl t="Head office number (shops' tills sit under it)"><input className="input tnum" inputMode="numeric" value={head} onChange={(e) => setHead(e.target.value.replace(/\D/g, ''))} /></Lbl>
+        <ErrorText>{err}</ErrorText>
+        {ok && <p className="text-sm text-field-600" role="status">Saved. New shops reuse these when you approve them.</p>}
+        <button onClick={save} disabled={busy || !key || !secret} className="btn-primary w-full inline-flex items-center justify-center gap-1.5">{busy && <Loader2 className="w-4 h-4 animate-spin" />} Save and check keys</button>
+      </Card>
+    </div>
   );
 }
 
@@ -187,7 +233,7 @@ function PlatformNumber() {
     setErr(null); setOk(false); setBusy(true);
     const r = await pay.platformSave({ enabled, kind, number, displayName: name, env, consumerKey: key || undefined, consumerSecret: secret || undefined, passkey: passkey || undefined, headOfficeNumber: head || undefined });
     setBusy(false);
-    if (!r.ok) { setErr(r.error ?? 'Could not save.'); return; }
+    if (!r.ok) { setErr(pay.why(r)); return; }
     setKey(''); setSecret(''); setPasskey(''); setOk(true); await load();
   }
   return (

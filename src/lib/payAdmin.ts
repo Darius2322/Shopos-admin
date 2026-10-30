@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
 
 /** Talks to the pay-admin function. Keys travel one way (to the server) and are never read back. */
-interface Reply { ok: boolean; error?: string; [k: string]: unknown }
+export interface Reply { ok: boolean; error?: string; detail?: string; [k: string]: unknown }
+/** Plain message plus Safaricom's own words (already scrubbed by the server), so the admin can see what to fix. */
+export const why = (r: Reply) => (r.error ?? 'Something went wrong.') + (r.detail ? ` (${r.detail})` : '');
 async function call(body: Record<string, unknown>): Promise<Reply> {
   if (!supabase) return { ok: false, error: 'Not connected.' };
   const { data, error } = await supabase.functions.invoke('pay-admin', { body });
@@ -23,6 +25,9 @@ export async function sourceStatus(sourceId: string): Promise<SourceStatus | { e
 export const saveKeys = (i: { sourceId: string; env: 'sandbox' | 'production'; consumerKey: string; consumerSecret: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'save', ...i });
 export const savePayout = (sourceId: string, initiator: string, credential: string) => call({ action: 'payout_creds', sourceId, initiator, credential });
 export const registerIncoming = (sourceId: string) => call({ action: 'register_c2b', sourceId });
+export const approveSource = (sourceId: string) => call({ action: 'approve', sourceId });
+export const defaultsStatus = () => call({ action: 'defaults_status' });
+export const defaultsSave = (i: { env: 'sandbox' | 'production'; consumerKey: string; consumerSecret: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'defaults_save', ...i });
 export const disconnect = (sourceId: string) => call({ action: 'disconnect', sourceId });
 export interface PlatformPay { enabled: boolean; kind: 'mpesa_till' | 'mpesa_paybill' | null; number: string | null; displayName: string | null; env: 'sandbox' | 'production' | null; hasKeys: boolean; hasPasskey: boolean; headOfficeNumber: string | null }
 export async function platformStatus(): Promise<PlatformPay | { error: string }> {

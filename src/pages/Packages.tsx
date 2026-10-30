@@ -128,6 +128,7 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
   const [priceTxt, setPriceTxt] = useState('');
   const [yearTxt, setYearTxt] = useState('');
   const [valTxt, setValTxt] = useState('');
+  const [unit, setUnit] = useState<'days' | 'months' | 'years' | 'life'>('months');
   const [counts, setCounts] = useState<Record<string, number>>({});
   useEffect(() => { void supabase.rpc('admin_package_stats').then(({ data }) => { const m: Record<string, number> = {}; for (const r of ((data as { packages?: { id: string; businesses_now: number }[] } | null)?.packages ?? [])) m[r.id] = r.businesses_now; setCounts(m); }); }, [supabase, pkgs]);
   const [featText, setFeatText] = useState('');
@@ -136,7 +137,9 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
 
   function open(p: Pkg) {
     setEdit({ ...p }); setFeatText((p.features ?? []).join('\n')); setErr(null);
-    setPriceTxt(p.id ? String(p.price) : ''); setYearTxt(p.yearly_price ? String(p.yearly_price) : ''); setValTxt(p.validity_days ? String(p.validity_days) : p.validity_months !== null ? String(p.validity_months) : '');
+    setPriceTxt(p.id ? String(p.price) : ''); setYearTxt(p.yearly_price ? String(p.yearly_price) : ''); const yrs = !p.validity_days && p.validity_months !== null && p.validity_months > 0 && p.validity_months % 12 === 0;
+    setUnit(p.validity_days ? 'days' : p.validity_months === null ? 'life' : yrs ? 'years' : 'months');
+    setValTxt(p.validity_days ? String(p.validity_days) : p.validity_months !== null ? String(yrs ? p.validity_months / 12 : p.validity_months) : '');
   }
   async function save() {
     if (!edit) return;
@@ -145,12 +148,13 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
     if (!Number.isFinite(price) || price < 0) { setErr('Enter the cost as a number, for example 1500.'); return; }
     const yearly = yearTxt.trim() === '' ? null : Number(yearTxt);
     if (yearly !== null && (!Number.isFinite(yearly) || yearly <= 0)) { setErr('Enter the 1-year price as a number, or leave it empty.'); return; }
-    const life = !edit.validity_days && edit.validity_months === null;
+    const life = unit === 'life';
     const n = parseInt(valTxt, 10);
-    if (!life && edit.validity_days && !(n >= 1 && n <= 3650)) { setErr('Enter how many days it lasts (1 to 3650).'); return; }
-    if (!life && !edit.validity_days && !(n >= 1 && n <= 120)) { setErr('Enter how many months it lasts (1 to 120).'); return; }
+    if (unit === 'days' && !(n >= 1 && n <= 3650)) { setErr('Enter how many days it lasts (1 to 3650).'); return; }
+    if (unit === 'months' && !(n >= 1 && n <= 120)) { setErr('Enter how many months it lasts (1 to 120).'); return; }
+    if (unit === 'years' && !(n >= 1 && n <= 10)) { setErr('Enter how many years it lasts (1 to 10).'); return; }
     setBusy('save'); setErr(null);
-    const pay = { ...edit, price, yearly_price: yearly, validity_days: life ? null : edit.validity_days ? n : null, validity_months: life ? null : edit.validity_days ? null : n };
+    const pay = { ...edit, price, yearly_price: yearly, validity_days: unit === 'days' ? n : null, validity_months: life ? null : unit === 'days' ? null : unit === 'years' ? n * 12 : n };
     const { error } = await supabase.rpc('admin_save_package', { p: { ...pay, id: edit.id || null, features: featText.split('\n').map((s) => s.trim()).filter(Boolean) } });
     if (error) setErr(friendlyError(error, 'Could not save this package.')); else { setEdit(null); setView(null); await reload(); }
     setBusy(null);
@@ -202,11 +206,11 @@ function PackagesTab({ supabase, pkgs, services, reload }: { supabase: SupabaseC
               <label className="block"><span className="block text-xs text-slate-400 mb-1">Cost ({edit.currency})</span><input className="input" type="text" inputMode="decimal" placeholder="0" value={priceTxt} onChange={(e) => { if (/^\d*\.?\d{0,2}$/.test(e.target.value)) setPriceTxt(e.target.value); }} /></label>
               <div className="block"><span className="block text-xs text-slate-400 mb-1">Valid for</span>
                 <div className="flex gap-1.5">
-                  <select className="input !w-auto" aria-label="Unit" value={edit.validity_days ? 'days' : edit.validity_months === null ? 'life' : 'months'}
-                    onChange={(e) => { setEdit({ ...edit, validity_days: e.target.value === 'days' ? (edit.validity_days ?? 7) : null, validity_months: e.target.value === 'months' ? (edit.validity_months ?? 1) : null }); setValTxt(e.target.value === 'days' ? '7' : e.target.value === 'months' ? '1' : ''); }}>
-                    <option value="days">Days</option><option value="months">Months</option><option value="life">Lifetime</option>
+                  <select className="input !w-auto" aria-label="Unit" value={unit}
+                    onChange={(e) => { const u = e.target.value as typeof unit; setUnit(u); setValTxt(u === 'days' ? '7' : u === 'months' ? '1' : u === 'years' ? '1' : ''); }}>
+                    <option value="days">Days</option><option value="months">Months</option><option value="years">Years</option><option value="life">Lifetime</option>
                   </select>
-                  {(edit.validity_days || edit.validity_months !== null) && <input className="input min-w-0" type="text" inputMode="numeric" placeholder={edit.validity_days ? 'Days' : 'Months'} aria-label={edit.validity_days ? 'Number of days' : 'Number of months'} value={valTxt} onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setValTxt(e.target.value); }} />}
+                  {unit !== 'life' && <input className="input min-w-0" type="text" inputMode="numeric" placeholder={unit === 'days' ? 'Days' : unit === 'years' ? 'Years' : 'Months'} aria-label={`Number of ${unit}`} value={valTxt} onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setValTxt(e.target.value); }} />}
                 </div>
               </div>
             </div>

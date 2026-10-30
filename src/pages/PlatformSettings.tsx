@@ -47,6 +47,7 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
 
   return (
     <div className="max-w-sm space-y-6">
+      <MaintenanceCard supabase={supabase} />
       <PublicFiguresCard supabase={supabase} />
       <ChangePasswordCard supabase={supabase} />
       <div>
@@ -162,6 +163,59 @@ function PublicFiguresCard({ supabase }: { supabase: SupabaseClient }) {
           </label>
         ))}
         {msg && <p className="text-xs text-slate-400" role="status">{msg}</p>}
+      </Card>
+    </div>
+  );
+}
+
+const PARTS: [string, string][] = [['sales', 'Selling (POS and sales)'], ['payments', 'M-Pesa and payments'], ['reports', 'Reports and analytics'], ['stock', 'Stock and products'], ['packages', 'Packages and plans']];
+/** Close the main app (or parts of it) for maintenance. Shops see a calm notice; nothing is lost. */
+function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
+  const [closed, setClosed] = useState(false);
+  const [parts, setParts] = useState<string[]>([]);
+  const [message, setMessage] = useState('');
+  const [backAt, setBackAt] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    void supabase.rpc('app_status').then(({ data }) => {
+      const d = data as { closed?: boolean; parts?: string[]; message?: string | null; back_at?: string | null } | null;
+      if (d) { setClosed(!!d.closed); setParts(d.parts ?? []); setMessage(d.message ?? ''); setBackAt(d.back_at ? new Date(d.back_at).toISOString().slice(0, 16) : ''); }
+      setLoaded(true);
+    });
+  }, []);
+  async function save(nextClosed = closed) {
+    setBusy(true); setMsg(null);
+    const { error } = await supabase.rpc('admin_set_maintenance', { p_closed: nextClosed, p_parts: parts, p_message: message, p_back_at: backAt ? new Date(backAt).toISOString() : null });
+    setBusy(false);
+    if (error) { setMsg('Could not save. Please try again.'); return; }
+    setClosed(nextClosed); setMsg(nextClosed ? 'The whole app is now closed for everyone.' : parts.length ? 'Saved. The ticked parts are closed.' : 'Saved. The app is open.');
+  }
+  if (!loaded) return null;
+  return (
+    <div>
+      <h2 className="font-display font-semibold text-lg mb-1">Maintenance</h2>
+      <p className="text-xs text-slate-400 mb-3">Close the whole app, or only some parts, while you update ShopOS. Shops see your message instead. It takes up to a minute to reach open devices. Shops with no internet keep their last known setting.</p>
+      <Card className="space-y-3">
+        <div className={`rounded-lg p-3 text-sm ${closed ? 'bg-rust-500/15 text-rust-500' : parts.length ? 'bg-amber-500/15 text-amber-500' : 'bg-field-600/15 text-field-600'}`}>
+          {closed ? 'The whole app is CLOSED.' : parts.length ? `Open, with ${parts.length} part${parts.length === 1 ? '' : 's'} closed.` : 'The app is open.'}
+        </div>
+        <div>
+          <p className="text-xs text-slate-400 mb-1">Close only these parts</p>
+          {PARTS.map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 py-1 text-sm cursor-pointer"><input type="checkbox" checked={parts.includes(k)} onChange={(e) => setParts(e.target.checked ? [...parts, k] : parts.filter((x) => x !== k))} /> {label}</label>
+          ))}
+        </div>
+        <label className="block"><span className="block text-xs text-slate-400 mb-1">Message shown to shops (optional)</span><input className="input" maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="We are updating ShopOS. Back shortly." /></label>
+        <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={backAt} onChange={(e) => setBackAt(e.target.value)} /></label>
+        {msg && <p className="text-sm text-slate-300" role="status">{msg}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => void save(closed)} disabled={busy} className="btn-secondary text-sm">Save parts and message</button>
+          {closed
+            ? <button onClick={() => void save(false)} disabled={busy} className="btn-primary text-sm">Open the app again</button>
+            : <button onClick={() => { if (window.confirm('Close the WHOLE app for every business now?')) void save(true); }} disabled={busy} className="text-sm px-3 py-2 rounded-lg bg-rust-500 text-white">Close the whole app</button>}
+        </div>
       </Card>
     </div>
   );
