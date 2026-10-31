@@ -37,17 +37,20 @@ export async function platformStatus(): Promise<PlatformPay | { error: string }>
 }
 export const platformSave = (i: { enabled: boolean; kind: string; number: string; displayName?: string; accountNumber?: string; env?: string; consumerKey?: string; consumerSecret?: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'platform_save', ...i });
 
-export async function askAssistant(question: string, history: { role: 'me' | 'ai'; text: string }[]): Promise<{ text?: string; error?: string }> {
+export interface AssistantAction { business_id: string; kind: string; decision: string; label: string }
+async function invokeAssistant(body: Record<string, unknown>): Promise<{ text?: string; action?: AssistantAction | null; error?: string }> {
   if (!supabase) return { error: 'Not connected.' };
-  const { data, error } = await supabase.functions.invoke('admin-assistant', { body: { question, history } });
+  const { data, error } = await supabase.functions.invoke('admin-assistant', { body });
   if (error) {
     try {
-      const ctx = (error as { context?: Response }).context;
-      const st = ctx?.status;
+      const st = (error as { context?: Response }).context?.status;
       if (st === 429) return { error: 'Too many questions. Wait a moment.' };
       if (st === 503) return { error: 'The assistant is not switched on yet (no AI key on the server).' };
     } catch { /* fall through */ }
     return { error: 'The assistant could not answer. Please try again.' };
   }
-  return { text: String((data as { text?: string })?.text ?? '') };
+  const d = data as { text?: string; action?: AssistantAction | null };
+  return { text: String(d?.text ?? ''), action: d?.action ?? null };
 }
+export const askAssistant = (question: string, history: { role: 'me' | 'ai'; text: string }[]) => invokeAssistant({ question, history });
+export const confirmAssistantAction = (a: AssistantAction) => invokeAssistant({ confirm: { business_id: a.business_id, kind: a.kind, decision: a.decision } });
