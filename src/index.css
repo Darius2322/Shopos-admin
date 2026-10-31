@@ -17,6 +17,9 @@
   --color-slate-500: #a2ada7;
   --color-slate-700: #2a332f;
   --color-slate-800: #1c2320;
+  --color-slate-300: #c3cdc7;
+  --color-slate-600: #4a5750;
+  --color-slate-900: #0b100e;
 }
 
 /* Toggled on <html> by ThemeToggle / persisted in localStorage. Every color
@@ -37,10 +40,25 @@ html.light {
   --color-slate-500: #3d473f;
   --color-slate-700: #d8dfda;
   --color-slate-800: #e9ede9;
+  --color-slate-300: #2e3831;
+  --color-slate-600: #3d473f;
+  --color-slate-900: #eef2ee;
 }
+
+/* Light theme: colours that were written as fixed shades (built for the dark theme) are remapped so nothing turns pale-on-white. */
+html.light .text-white { color: var(--color-ink); }
+html.light .bg-red-600.text-white, html.light .bg-field-600.text-white { color: #fff; }
+html.light .text-emerald-300, html.light .text-emerald-400 { color: #1f7a4f; }
+html.light .text-red-400 { color: #b8442c; }
+html.light .text-slate-900 { color: var(--color-ink); }
+html.light .bg-emerald-500\/10, html.light .bg-emerald-500\/15 { background-color: rgba(47,143,96,.14); }
+html.light .bg-red-500\/10, html.light .bg-red-500\/20 { background-color: rgba(201,79,54,.12); }
+html.light select, html.light input, html.light textarea { color: var(--color-ink); }
+html.light ::placeholder { color: #6b776f; opacity: 1; }
 
 @layer base {
   html, body, #root { @apply h-full; }
+  html, body { overflow: hidden; overscroll-behavior: none; }
   body { @apply bg-paper text-ink font-sans antialiased; }
   h1, h2 { @apply font-display; }
 }
@@ -55,3 +73,11 @@ html.light {
      heading exactly at the viewport edge where it's clipped/hard to see. */
   .section-anchor { scroll-margin-top: 6.5rem; }
 }
+
+/* Terminal (Monitor tab) stays dark in both themes. */
+.term { --color-slate-300:#c3cdc7; --color-slate-400:#8f9c95; --color-slate-500:#a2ada7; --color-slate-600:#6b776f; --color-slate-700:#2a332f; --color-slate-800:#1c2320; --color-slate-900:#0b100e; --color-ink:#e9ede9; color:#e9ede9; }
+html.light .term .text-emerald-400, html.light .term .text-emerald-300 { color:#5cc48d; }
+html.light .term .text-red-400 { color:#f08a76; }
+html.light .term .text-slate-100, html.light .term .text-slate-200, html.light .term .text-white { color:#e9ede9; }
+html.light .text-slate-100, html.light .text-slate-200 { color: var(--color-ink); }
+html.light .hover\:bg-slate-700:hover { background-color: #cfd8d2; }

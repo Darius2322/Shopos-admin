@@ -224,7 +224,7 @@ export default function Monitor({ supabase }: { supabase: SupabaseClient }) {
           <button key={c} onClick={() => run(c)} disabled={busy} className="text-xs font-mono px-2.5 min-h-[32px] rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700">{c}</button>
         ))}
       </div>
-      <div className="rounded-xl border border-slate-700 bg-black overflow-hidden" onClick={() => field.current?.focus()}>
+      <div className="term rounded-xl border border-slate-700 bg-black overflow-hidden" onClick={() => field.current?.focus()}>
         <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-800 bg-slate-900/80">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" /><span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
           <span className="ml-2 text-[11px] font-mono text-slate-500">shopos@monitor {watching === false ? '' : '· ● live'}</span>

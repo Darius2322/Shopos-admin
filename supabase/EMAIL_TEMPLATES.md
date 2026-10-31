@@ -62,8 +62,8 @@ Same shape as above — swap the heading/button text ("Confirm your email" /
 ## Setting the Site URL (fixes the localhost:3000 redirect)
 
 **Authentication → URL Configuration:**
-- **Site URL:** `https://shopos-app.vercel.app`
-- **Redirect URLs:** add `https://shopos-app.vercel.app/**`
+- **Site URL:** `https://shopos.co.ke`
+- **Redirect URLs:** add `https://shopos.co.ke/**`
 
 This is what the invite/reset links actually redirect to after Supabase's
 own confirmation step — without it, Supabase falls back to whatever was

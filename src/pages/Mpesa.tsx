@@ -35,6 +35,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   const [payoutFor, setPayoutFor] = useState<Row | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [sub, setSub] = useState<'businesses' | 'keys' | 'number' | 'packages'>('businesses');
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_mpesa_list');
@@ -76,11 +77,16 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
       <ErrorText>{err}</ErrorText>
       {msg && <p className="text-sm text-field-600" role="status">{msg}</p>}
 
-      <SharedKeys />
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-700 -mx-1 px-1">
+        {([['businesses', `Businesses${waiting.length ? ` (${waiting.length})` : ''}`], ['keys', 'Shared keys'], ['number', 'ShopOS number'], ['packages', 'Package payments']] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px ${sub === k ? 'border-field-600 text-ink' : 'border-transparent text-slate-400 hover:text-ink'}`}>{l}</button>
+        ))}
+      </div>
 
-      <PlatformNumber />
+      {sub === 'keys' && <SharedKeys />}
+      {sub === 'number' && <PlatformNumber />}
 
-      <div className="space-y-2">
+      {sub === 'businesses' && <div className="space-y-2">
         <h3 className="font-medium text-sm">Businesses{waiting.length > 0 ? ` · ${waiting.length} waiting` : ''}</h3>
         {!rows ? <Skeleton /> : rows.length === 0 ? <Card><EmptyState message="No business has added an M-Pesa number yet." /></Card> : rows.map((r) => (
           <Card key={r.source_id} className="space-y-2">
@@ -107,9 +113,9 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
             </div>
           </Card>
         ))}
-      </div>
+      </div>}
 
-      <div className="space-y-2">
+      {sub === 'packages' && <div className="space-y-2">
         <h3 className="font-medium text-sm">Package payments</h3>
         {pkgs.length === 0 ? <Card><EmptyState message="No package payments yet." /></Card> : (
           <Card className="divide-y divide-slate-700 !p-0">
@@ -122,7 +128,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
             ))}
           </Card>
         )}
-      </div>
+      </div>}
 
       {setup && <KeysSheet row={setup} onClose={() => setSetup(null)} onDone={async () => { setSetup(null); setMsg('Keys saved for this shop. Press Approve to switch M-Pesa on.'); await load(); }} />}
       {payoutFor && <PayoutSheet row={payoutFor} onClose={() => setPayoutFor(null)} onDone={async () => { setPayoutFor(null); setMsg('Automatic refunds are on for this number.'); await load(); }} />}
@@ -148,7 +154,7 @@ function KeysSheet({ row, onClose, onDone }: { row: Row; onClose: () => void; on
       <Lbl t="Consumer key"><input className="input" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} /></Lbl>
       <Lbl t="Consumer secret"><input className="input" type="password" autoComplete="new-password" value={secret} onChange={(e) => setSecret(e.target.value)} /></Lbl>
       <Lbl t="Lipa na M-Pesa passkey"><input className="input" type="password" autoComplete="new-password" value={passkey} onChange={(e) => setPasskey(e.target.value)} placeholder={row.has_keys ? 'Leave empty to keep the saved one' : 'Needed for payment prompts'} /></Lbl>
-      {row.kind === 'mpesa_till' && <Lbl t="Head office number (only if different from the till)"><input className="input tnum" inputMode="numeric" value={head} onChange={(e) => setHead(e.target.value.replace(/\D/g, ''))} /></Lbl>}
+      {row.kind === 'mpesa_till' && <Lbl t="Head office number (only if different from the till)"><input className="input tnum" inputMode="numeric" value={head} onChange={(e) => setHead(e.target.value.replace(/\D/g, ''))} placeholder="Leave empty for the sandbox" /></Lbl>}
       <ErrorText>{err}</ErrorText>
       <button onClick={save} disabled={busy || !key || !secret} className="btn-primary w-full inline-flex items-center justify-center gap-1.5">{busy && <Loader2 className="w-4 h-4 animate-spin" />} Save and check keys</button>
     </Sheet>

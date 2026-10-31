@@ -72,7 +72,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
     <>
       {/* Desktop: permanent column with its own scroll, independent of the
           main content's scroll container. */}
-      <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 h-screen border-r border-slate-700 bg-paper">
+      <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 h-dvh border-r border-slate-700 bg-paper">
         <Brand />
         <NavList tab={tab} onSelect={select} badges={badges} />
         <div className="p-3 border-t border-slate-700 shrink-0">

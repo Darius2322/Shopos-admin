@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Save, KeyRound } from 'lucide-react';
 import { Card, ErrorText, Skeleton } from '../components/ui';
+import { LegalEditor } from '../components/LegalEditor';
 
 interface PlatformSettings {
   id: string;
@@ -16,7 +17,7 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [sub, setSub] = useState<'support' | 'maintenance' | 'landing' | 'security'>('support');
+  const [sub, setSub] = useState<'support' | 'maintenance' | 'landing' | 'legal' | 'security'>('support');
 
   async function load() {
     setLoading(true);
@@ -49,11 +50,12 @@ export default function PlatformSettingsPage({ supabase }: { supabase: SupabaseC
   return (
     <div className="max-w-md space-y-5">
       <div role="tablist" aria-label="Platform settings" className="flex gap-1.5 overflow-x-auto pb-1">
-        {([['support', 'Support contacts'], ['maintenance', 'Maintenance'], ['landing', 'Landing page'], ['security', 'My account']] as const).map(([k, l]) => (
+        {([['support', 'Support contacts'], ['maintenance', 'Maintenance'], ['landing', 'Landing page'], ['legal', 'Legal pages'], ['security', 'My account']] as const).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`whitespace-nowrap text-xs font-medium rounded-full px-3 py-1.5 border ${sub === k ? 'bg-field-600 border-field-600 text-white' : 'border-slate-700 text-slate-400 hover:text-ink'}`}>{l}</button>
         ))}
       </div>
       {sub === 'maintenance' && <MaintenanceCard supabase={supabase} />}
+      {sub === 'legal' && <LegalEditor supabase={supabase} />}
       {sub === 'landing' && <PublicFiguresCard supabase={supabase} />}
       {sub === 'security' && <ChangePasswordCard supabase={supabase} />}
       {sub === 'support' && <div>
@@ -181,13 +183,14 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
   const [parts, setParts] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [backAt, setBackAt] = useState('');
+  const [demoOpen, setDemoOpen] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     void supabase.rpc('app_status').then(({ data }) => {
-      const d = data as { closed?: boolean; parts?: string[]; message?: string | null; back_at?: string | null } | null;
-      if (d) { setClosed(!!d.closed); setParts(d.parts ?? []); setMessage(d.message ?? ''); setBackAt(d.back_at ? new Date(d.back_at).toISOString().slice(0, 16) : ''); }
+      const d = data as { closed?: boolean; parts?: string[]; message?: string | null; back_at?: string | null; demo_open?: boolean } | null;
+      if (d) { setDemoOpen(d.demo_open !== false); setClosed(!!d.closed); setParts(d.parts ?? []); setMessage(d.message ?? ''); setBackAt(d.back_at ? new Date(d.back_at).toISOString().slice(0, 16) : ''); }
       setLoaded(true);
     });
   }, []);
@@ -197,6 +200,13 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
     setBusy(false);
     if (error) { setMsg('Could not save. Please try again.'); return; }
     window.dispatchEvent(new Event('shopos-status')); setClosed(nextClosed); setMsg(nextClosed ? 'The whole app is now closed for everyone.' : parts.length ? 'Saved. The ticked parts are closed.' : 'Saved. The app is open.');
+  }
+  async function toggleDemo(next: boolean) {
+    setBusy(true); setMsg(null);
+    const { error } = await supabase.rpc('admin_set_demo', { p_open: next });
+    setBusy(false);
+    if (error) { setMsg('Could not change the demo. Please try again.'); return; }
+    setDemoOpen(next); window.dispatchEvent(new Event('shopos-status')); setMsg(next ? 'The demo is open.' : 'The demo is closed. Visitors cannot start it.');
   }
   if (!loaded) return null;
   return (
@@ -215,6 +225,12 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
         </div>
         <label className="block"><span className="block text-xs text-slate-400 mb-1">Message shown to shops (optional)</span><input className="input" maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="We are updating ShopOS. Back shortly." /></label>
         <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={backAt} onChange={(e) => setBackAt(e.target.value)} /></label>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 p-3">
+          <div className="min-w-0"><p className="text-sm font-medium">Demo</p><p className="text-xs text-slate-400">{demoOpen ? 'Open: anyone can try the practice shop.' : 'Closed: the Try the demo buttons stop working.'}</p></div>
+          {demoOpen
+            ? <button onClick={() => void toggleDemo(false)} disabled={busy} className="btn-secondary text-xs shrink-0">Close the demo</button>
+            : <button onClick={() => void toggleDemo(true)} disabled={busy} className="btn-primary text-xs shrink-0">Open the demo</button>}
+        </div>
         {msg && <p className="text-sm text-slate-300" role="status">{msg}</p>}
         <div className="flex flex-wrap gap-2">
           <button onClick={() => void save(closed)} disabled={busy} className="btn-secondary text-sm">Save parts and message</button>

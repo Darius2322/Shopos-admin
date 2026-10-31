@@ -145,10 +145,10 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
     // height/overflow — scrolling one never moves the other, and on phones
     // the sidebar becomes a drawer opened from the hamburger button below
     // instead of a horizontal tab strip that could hide items off-screen.
-    <div className="h-screen flex overflow-hidden bg-paper text-ink">
+    <div className="h-dvh flex overflow-hidden bg-paper text-ink">
       <Sidebar tab={tab === 'installers' || tab === 'releases' ? 'apps' : tab} onSelect={selectTab} onSignOut={onSignOut} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} badges={badges} />
 
-      <div className="flex-1 min-w-0 flex flex-col h-screen">
+      <div className="flex-1 min-w-0 flex flex-col h-dvh">
         <header className="shrink-0 sticky top-0 z-30 border-b border-slate-700 bg-paper">
           {/* One sticky bar, same on phone and desktop: menu, main-app status, assistant, search, theme, notifications. */}
           <div className="flex items-center gap-2 px-3 py-2">
@@ -167,7 +167,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-5">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-5">
           <div className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-4xl' : 'max-w-3xl'}`}>
             {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />}
             {tab === 'requests' && <OwnerRequests supabase={supabase} />}
