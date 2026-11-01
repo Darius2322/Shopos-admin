@@ -27,12 +27,14 @@ if (typeof window !== 'undefined') window.addEventListener('pointerdown', () => 
 export function chime() {
   const c = audio();
   if (!c || c.state !== 'running') return;
-  [[880, 0], [1175, 0.14]].forEach(([f, at]) => {
+  // Full-volume square-ish tones through a compressor so it is clearly audible on a phone speaker, three rising notes.
+  const comp = c.createDynamicsCompressor(); comp.connect(c.destination);
+  [[784, 0], [988, 0.18], [1319, 0.36]].forEach(([f, at]) => {
     const o = c.createOscillator(); const g = c.createGain();
-    o.type = 'sine'; o.frequency.value = f;
+    o.type = 'triangle'; o.frequency.value = f;
     const t = c.currentTime + at;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.4);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o.connect(g).connect(comp); o.start(t); o.stop(t + 0.55);
   });
 }
 const total = (b: Badges) => b.requests + b.package_requests + b.features + b.reviews + b.support + b.installers;
