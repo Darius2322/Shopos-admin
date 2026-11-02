@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Bot, Menu } from 'lucide-react';
+import { Bot, Menu, RefreshCw } from 'lucide-react';
 import { AppStatusPill } from './components/AppStatusPill';
 import { supabase } from './lib/supabase';
 import { Centered } from './components/ui';
@@ -129,6 +129,23 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const badges = useBadges(supabase);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  /** Refreshes the whole portal: checks for a newer version of the portal itself (and loads it if there is one), then reloads the
+   * numbers on whatever page is open, the status pill, the badges and the notifications. */
+  async function refreshAll() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (reg) { await reg.update(); if (reg.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); return; } }
+    } catch { /* offline or no service worker: just refresh the data */ }
+    setRefreshKey((k) => k + 1);
+    window.dispatchEvent(new Event('badges:refresh'));
+    window.dispatchEvent(new Event('admin-refresh'));
+    window.setTimeout(() => setRefreshing(false), 800);
+  }
 
   function openBusiness(id: string) {
     setOpenBusinessId(id);
@@ -157,18 +174,19 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
               {Object.entries(badges).some(([k, v]) => k !== 'packages_expiring' && v > 0) && <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rust-500" aria-label="New items" />}
             </button>
             <span className="hidden lg:inline font-display font-semibold text-sm shrink-0 mr-1">{TAB_LABELS[tab]}</span>
-            <AppStatusPill supabase={supabase} onOpen={() => selectTab('settings')} />
+            <AppStatusPill key={`pill${refreshKey}`} supabase={supabase} onOpen={() => selectTab('settings')} />
             <button aria-label="AI assistant" title="AI assistant" onClick={() => selectTab('assistant')} className="p-1.5 text-slate-400 hover:text-ink shrink-0"><Bot className="w-5 h-5" /></button>
             <div className="flex-1 min-w-0"><GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} /></div>
             <div className="flex items-center gap-0.5 shrink-0">
+              <button aria-label="Refresh everything" title="Refresh everything" onClick={() => void refreshAll()} className="p-1.5 text-slate-400 hover:text-ink"><RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} /></button>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              <NotificationsMenu supabase={supabase} onGoToRequests={() => selectTab('requests')} />
+              <NotificationsMenu key={`bell${refreshKey}`} supabase={supabase} onGoToRequests={() => selectTab('requests')} />
             </div>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto overscroll-contain p-5">
-          <div className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-4xl' : 'max-w-3xl'}`}>
+          <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-5xl' : 'max-w-3xl'}`}>
             {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />}
             {tab === 'requests' && <OwnerRequests supabase={supabase} />}
             {tab === 'businesses' && (

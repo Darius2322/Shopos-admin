@@ -3,15 +3,17 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from './ui';
 import { friendlyError } from '../lib/friendlyError';
 import { Download, Loader2, RefreshCw } from 'lucide-react';
+import { SlotModal, TrailModal, VisitorViews, VISITOR_VIEWS, type VisitorView } from './VisitorViews';
 
 interface Overview {
   visitors: number; prev_visitors: number; sessions: number; prev_sessions: number; pageviews: number; prev_pageviews: number; new_visitors: number;
   bounce_rate: number | null; avg_pages: number | null; avg_seconds: number | null; live_now: number; installs: number; demos: number;
   signed_in_visitors: number; pwa_visitors: number; desktop_downloads: number;
+  bot_hits: number; ips: number; countries: number; cities: number; located_share: number | null;
 }
 interface Point { bucket: string; visitors: number; sessions: number; pageviews: number }
 interface Row { label: string; visitors: number; pageviews: number }
-interface Recent { created_at: string; event: string; path: string; country: string | null; city: string | null; device: string | null; os: string | null; browser: string | null; referrer_host: string | null; signed_in: boolean; visitor: string }
+interface Recent { created_at: string; event: string; path: string; country: string | null; city: string | null; device: string | null; os: string | null; browser: string | null; referrer_host: string | null; signed_in: boolean; visitor: string; visitor_full: string; ip: string | null }
 interface Heat { dow: number; hr: number; pageviews: number }
 interface Step { step: string; visitors: number }
 interface TypeRow { business_type: string; businesses: number }
@@ -82,7 +84,7 @@ function Bars({ rows, render }: { rows: Row[]; render?: (l: string) => string })
   );
 }
 
-function Heatmap({ rows }: { rows: Heat[] }) {
+function Heatmap({ rows, onPick }: { rows: Heat[]; onPick: (dow: number, hr: number | null) => void }) {
   const grid = useMemo(() => { const g = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]); rows.forEach((r) => { g[n(r.dow)][n(r.hr)] = n(r.pageviews); }); return g; }, [rows]);
   const max = Math.max(1, ...grid.flat());
   return (
@@ -90,11 +92,15 @@ function Heatmap({ rows }: { rows: Heat[] }) {
       <div className="min-w-[520px]">
         {grid.map((row, d) => (
           <div key={d} className="flex items-center gap-[2px] mb-[2px]">
-            <span className="w-8 text-[10px] text-slate-500 shrink-0">{DOW[d]}</span>
-            {row.map((v, h) => <div key={h} className="flex-1 h-4 rounded-[2px]" style={{ background: v ? `rgba(14,159,142,${0.15 + 0.85 * (v / max)})` : '#1e293b' }} title={`${DOW[d]} ${String(h).padStart(2, '0')}:00 — ${v} page views`} />)}
+            <button type="button" onClick={() => onPick(d, null)} aria-label={`Open all of ${DOW[d]}`} title={`Open the whole of ${DOW[d]}`} className="w-8 text-left text-[10px] text-slate-400 hover:text-teal-300 shrink-0">{DOW[d]}</button>
+            {row.map((v, h) => (
+              <button key={h} type="button" onClick={() => onPick(d, h)} aria-label={`${DOW[d]} ${String(h).padStart(2, '0')}:00, ${v} page views. Open`} className="flex-1 h-5 rounded-[2px] hover:ring-1 hover:ring-teal-300 focus-visible:ring-2 focus-visible:ring-teal-300 outline-none"
+                style={{ background: v ? `rgba(14,159,142,${0.15 + 0.85 * (v / max)})` : '#1e293b' }} title={`${DOW[d]} ${String(h).padStart(2, '0')}:00 — ${v} page views. Press to open`} />
+            ))}
           </div>
         ))}
         <div className="flex pl-8 text-[9px] text-slate-500 justify-between mt-0.5"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+        <p className="text-[10px] text-slate-500 mt-1">Press a box to open that hour, or a day name to open the whole day.</p>
       </div>
     </div>
   );
@@ -113,6 +119,10 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
   const [dims, setDims] = useState<Record<string, Row[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<VisitorView>(() => { try { const v = localStorage.getItem('shopos-admin-visitor-view') as VisitorView; return VISITOR_VIEWS.some(([k]) => k === v) ? v : 'overview'; } catch { return 'overview'; } });
+  const [slot, setSlot] = useState<{ dow: number; hr: number | null } | null>(null);
+  const [trail, setTrail] = useState<string | null>(null);
+  const pickView = (v: VisitorView) => { setView(v); try { localStorage.setItem('shopos-admin-visitor-view', v); } catch { /* ignore */ } };
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setBusy(true);
@@ -120,7 +130,7 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
     try {
       const [o, s, h, f, r, t, ...b] = await Promise.all([
         supabase.rpc('admin_site_overview', { p_days: days }), supabase.rpc('admin_site_timeseries', { p_days: days }), supabase.rpc('admin_site_hourly', { p_days: days }),
-        supabase.rpc('admin_site_funnel', { p_days: days }), supabase.rpc('admin_site_recent', { p_limit: 40 }), supabase.rpc('admin_business_types'),
+        supabase.rpc('admin_site_funnel', { p_days: days }), supabase.rpc('admin_site_recent2', { p_limit: 60, p_bots: false }), supabase.rpc('admin_business_types'),
         ...BREAKDOWNS.map((x) => supabase.rpc('admin_site_breakdown', { p_days: days, p_dim: x.dim, p_limit: 10 }))
       ]);
       const firstErr = [o, s, h, f, r, t, ...b].find((x) => x.error);
@@ -163,9 +173,13 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
           <button onClick={csv} disabled={!series.length} aria-label="Download CSV" className="min-h-[32px] px-3 rounded-full bg-slate-800 text-slate-300 text-xs inline-flex items-center gap-1 disabled:opacity-40"><Download className="w-3.5 h-3.5" /> CSV</button>
         </div>
       </div>
-      {error && <p role="alert" className="text-sm text-rust-500 mb-3">Could not load visitor figures: {error}</p>}
-      {!ov && !error && <p className="text-sm text-slate-500">Loading…</p>}
-      {ov && (
+      <div className="flex gap-1 overflow-x-auto mb-3 pb-1" role="tablist" aria-label="Visitor sections">
+        {VISITOR_VIEWS.map(([k, l]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => pickView(k)} className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap ${view === k ? 'bg-teal-700 text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'}`}>{l}</button>)}
+      </div>
+      {view !== 'overview' && <VisitorViews supabase={supabase} days={days} view={view} />}
+      {view === 'overview' && error && <p role="alert" className="text-sm text-rust-500 mb-3">Could not load visitor figures: {error}</p>}
+      {view === 'overview' && !ov && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {view === 'overview' && ov && (
         <div className="space-y-3">
           {ov.pageviews === 0 && <Card><p className="text-sm text-slate-300">No visits recorded in this period yet. Visits appear here once the new app version is live and people open the site. Browsers that send “Do Not Track” and demo sessions are not counted.</p></Card>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -181,6 +195,10 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
             <Tile label="Installed the app" value={fmt(ov.installs)} />
             <Tile label="Desktop downloads" value={fmt(ov.desktop_downloads)} />
             <Tile label="Signed-in visitors" value={fmt(ov.signed_in_visitors)} sub={<span className="text-[10px] text-slate-500">{fmt(ov.pwa_visitors)} via installed app</span>} />
+            <Tile label="Different IP addresses" value={fmt(ov.ips ?? 0)} />
+            <Tile label="Countries" value={fmt(ov.countries ?? 0)} />
+            <Tile label="Cities" value={fmt(ov.cities ?? 0)} />
+            <Tile label="Bot requests" value={fmt(ov.bot_hits ?? 0)} sub={<span className="text-[10px] text-slate-500">{ov.located_share == null ? 'no location yet' : `${ov.located_share}% of visits located`}</span>} />
           </div>
 
           <Card>
@@ -203,7 +221,7 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
             </Card>
             <Card>
               <div className="text-sm font-medium mb-2">Busiest times <span className="text-xs text-slate-500 font-normal">· page views, Kenya time</span></div>
-              <Heatmap rows={heat} />
+              <Heatmap rows={heat} onPick={(d, h) => setSlot({ dow: d, hr: h })} />
             </Card>
           </div>
 
@@ -221,25 +239,28 @@ export function SiteAnalytics({ supabase }: { supabase: SupabaseClient }) {
           </div>
 
           <Card>
-            <div className="text-sm font-medium mb-2">Latest activity <span className="text-[10px] text-slate-500 font-normal">refreshes every 30 seconds</span></div>
+            <div className="text-sm font-medium mb-2">Latest activity <span className="text-[10px] text-slate-500 font-normal">refreshes every 30 seconds · press a row for that visitor's trail</span></div>
             {recent.length === 0 ? <p className="text-xs text-slate-500">Nothing yet.</p> : (
-              <div className="overflow-x-auto -mx-1"><table className="w-full text-xs min-w-[560px]">
-                <thead><tr className="text-slate-500 text-left"><th className="px-1 py-1 font-medium">When</th><th className="px-1 font-medium">What</th><th className="px-1 font-medium">Where</th><th className="px-1 font-medium">Device</th><th className="px-1 font-medium">From</th><th className="px-1 font-medium">Visitor</th></tr></thead>
+              <div className="overflow-x-auto -mx-1"><table className="w-full text-xs min-w-[680px]">
+                <thead><tr className="text-slate-500 text-left"><th className="px-1 py-1 font-medium">When</th><th className="px-1 font-medium">What</th><th className="px-1 font-medium">Where</th><th className="px-1 font-medium">IP address</th><th className="px-1 font-medium">Device</th><th className="px-1 font-medium">From</th><th className="px-1 font-medium">Visitor</th></tr></thead>
                 <tbody>{recent.map((r, i) => (
-                  <tr key={i} className="border-t border-slate-800">
+                  <tr key={i} onClick={() => setTrail(r.visitor_full)} className="border-t border-slate-800 cursor-pointer hover:bg-slate-800/40">
                     <td className="px-1 py-1.5 text-slate-400 whitespace-nowrap">{ago(r.created_at)}</td>
                     <td className="px-1">{r.event === 'pageview' ? r.path : (EVENT_LABEL[r.event] ?? r.event)}{r.signed_in && <span className="ml-1 text-[9px] bg-slate-700 rounded px-1">signed in</span>}</td>
-                    <td className="px-1 text-slate-300">{[r.city, r.country ? country(r.country) : null].filter(Boolean).join(', ') || '–'}</td>
+                    <td className="px-1 text-slate-300">{[r.city, r.country ? country(r.country) : null].filter(Boolean).join(', ') || 'Unknown'}</td>
+                    <td className="px-1 text-slate-400 font-mono">{r.ip ?? '–'}</td>
                     <td className="px-1 text-slate-300">{[r.device, r.os, r.browser].filter(Boolean).join(' · ')}</td>
-                    <td className="px-1 text-slate-400">{r.referrer_host ?? '–'}</td>
+                    <td className="px-1 text-slate-400">{r.referrer_host ?? 'Direct'}</td>
                     <td className="px-1 text-slate-500 font-mono">{r.visitor}</td>
                   </tr>))}</tbody>
               </table></div>
             )}
           </Card>
-          <p className="text-[11px] text-slate-500">Anonymous counting only: no names, emails, phone numbers or IP addresses are stored. A visitor is one browser. Bots and crawlers are filtered out. Countries and cities come from the network, so they are approximate.</p>
+          <p className="text-[11px] text-slate-500">No names, emails or phone numbers are stored. IP addresses are visible only here and erased after 90 days. A visitor is one browser. Bots and crawlers are counted separately (Bots & crawlers tab), not as visitors. Countries and cities come from the network, so they are approximate; visits before the new website version went live have no location.</p>
         </div>
       )}
+      {slot && <SlotModal supabase={supabase} days={days} dow={slot.dow} hr={slot.hr} onClose={() => setSlot(null)} onTrail={(v) => { setSlot(null); setTrail(v); }} />}
+      {trail && <TrailModal supabase={supabase} visitor={trail} onClose={() => setTrail(null)} />}
     </div>
   );
 }
