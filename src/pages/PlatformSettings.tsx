@@ -179,7 +179,7 @@ function PublicFiguresCard({ supabase }: { supabase: SupabaseClient }) {
 const PARTS: [string, string][] = [
   ['sales', 'Selling (POS and sales)'], ['payments', 'M-Pesa and payments'], ['reports', 'Reports and analytics'], ['stock', 'Stock and products'],
   ['packages', 'Packages and plans'], ['customers', 'Customers and debts'], ['documents', 'Quotations and invoices'], ['suppliers', 'Suppliers and expenses'],
-  ['staff', 'Staff and users'], ['partners', 'Reseller / partner programme'], ['support', 'Support and help'], ['loyalty', 'Loyalty and rewards'],
+  ['staff', 'Staff and users'], ['partners', 'Reseller / partner programme'], ['support', 'Support and help'], ['loyalty', 'Loyalty and rewards'], ['demo', 'Demo (practice shop)'],
 ];
 const partLabel = (k: string) => PARTS.find(([p]) => p === k)?.[1] ?? k;
 const when = (s: string | null) => (s ? new Date(s).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
