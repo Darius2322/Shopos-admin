@@ -134,7 +134,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   }
 
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
-  const [newOwnerPassword, setNewOwnerPassword] = useState('');
+  const DEFAULT_OWNER_PASSWORD = 'Shopos 001';
+  const [newOwnerPassword, setNewOwnerPassword] = useState(DEFAULT_OWNER_PASSWORD);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetPasswordResult, setResetPasswordResult] = useState<string | null>(null);
 
@@ -184,8 +185,8 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'Could not reset password');
-      setResetPasswordResult('Password reset. Share it with the owner directly — it is shown only once here.');
-      setNewOwnerPassword('');
+      setResetPasswordResult(`Password reset to “${newOwnerPassword}”. Share it with the owner directly and ask them to change it in Settings → Security.`);
+      setNewOwnerPassword(DEFAULT_OWNER_PASSWORD);
     } catch (err) {
       setError(describeError(err, 'Could not reset password — is admin-reset-owner-password deployed?'));
     } finally { setResettingPassword(false); }
@@ -439,7 +440,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={owner.status} />
-              <button onClick={() => setResetPasswordOpen(true)} title="Reset password" className="p-1.5 text-slate-400 hover:text-ink">
+              <button onClick={() => { setNewOwnerPassword(DEFAULT_OWNER_PASSWORD); setResetPasswordOpen(true); }} title="Reset password" className="p-1.5 text-slate-400 hover:text-ink">
                 <Lock className="w-4 h-4" />
               </button>
             </div>
@@ -550,9 +551,19 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
               </>
             ) : (
               <>
+                <div className="flex gap-2 mb-3">
+                  <button type="button" onClick={() => setNewOwnerPassword(DEFAULT_OWNER_PASSWORD)}
+                    className={`flex-1 text-sm rounded-lg border px-3 py-2 ${newOwnerPassword === DEFAULT_OWNER_PASSWORD ? 'border-field-600 text-field-600 font-medium' : 'border-slate-300 text-slate-500'}`}>
+                    Default ({DEFAULT_OWNER_PASSWORD})
+                  </button>
+                  <button type="button" onClick={() => setNewOwnerPassword('')}
+                    className={`flex-1 text-sm rounded-lg border px-3 py-2 ${newOwnerPassword !== DEFAULT_OWNER_PASSWORD ? 'border-field-600 text-field-600 font-medium' : 'border-slate-300 text-slate-500'}`}>
+                    Custom
+                  </button>
+                </div>
                 <input
-                  className="input mb-3" type="text" placeholder="New password (min 8 characters)"
-                  value={newOwnerPassword} onChange={(e) => setNewOwnerPassword(e.target.value)} minLength={8} autoFocus
+                  className="input mb-3" type="text" placeholder="Custom password (min 8 characters)"
+                  value={newOwnerPassword} onChange={(e) => setNewOwnerPassword(e.target.value)} minLength={8}
                 />
                 <div className="flex gap-2">
                   <button onClick={resetOwnerPassword} disabled={resettingPassword || newOwnerPassword.length < 8} className="btn-primary flex-1">
