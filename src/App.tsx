@@ -6,6 +6,7 @@ import { supabase } from './lib/supabase';
 import { Centered } from './components/ui';
 import Packages from './pages/Packages';
 import BusinessTypes from './pages/BusinessTypes';
+import Bookings from './pages/Bookings';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
 import { useBadges } from './lib/badges';
@@ -120,7 +121,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'M-Pesa', assistant: 'Assistant',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -214,6 +215,9 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
+            {tab === 'bk_apps' && <Bookings supabase={supabase} view="apps" />}
+            {tab === 'bk_biz' && <Bookings supabase={supabase} view="biz" />}
+            {tab === 'bk_bookings' && <Bookings supabase={supabase} view="bookings" />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>

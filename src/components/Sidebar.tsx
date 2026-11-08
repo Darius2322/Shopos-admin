@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette } from 'lucide-react';
+import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bk_apps' | 'bk_biz' | 'bk_bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -13,6 +13,9 @@ export const TABS: [Tab, string, any][] = [
   ['mpesa', 'M-Pesa', Wallet],
   ['packages', 'Packages', Package],
   ['businesstypes', 'Business Types', Palette],
+  ['bk_apps', 'Applications', Users],
+  ['bk_biz', 'Booking businesses', Store],
+  ['bk_bookings', 'All bookings', CalendarCheck],
   ['softdelete', 'Soft Delete', Trash2],
   ['branches', 'Branches', Store],
   ['features', 'Feature Requests', Sparkles],
@@ -44,6 +47,8 @@ const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'monitor', 'audit', 'settings'] },
 ];
+const BOOKING_GROUP = { id: 'booking', label: 'ShopOS Booking', icon: CalendarCheck, tabs: ['bk_apps', 'bk_biz', 'bk_bookings'] as Tab[] };
+const isBooking = (t: Tab) => BOOKING_GROUP.tabs.includes(t);
 const label = (t: Tab) => TABS.find(([k]) => k === t)![1];
 const iconOf = (t: Tab) => TABS.find(([k]) => k === t)![2];
 
@@ -52,13 +57,22 @@ function NavList({ tab, onSelect, badges }: { tab: Tab; onSelect: (tab: Tab) => 
     try { return JSON.parse(localStorage.getItem('shopos-admin-groups') ?? '{}'); } catch { return {}; }
   });
   const [sound, setSound] = useState(soundOn());
-  const activeGroup = GROUPS.find((g) => g.tabs.includes(tab))?.id;
+  const [product, setProduct] = useState<'shopos' | 'booking'>(isBooking(tab) ? 'booking' : 'shopos');
+  useEffect(() => { setProduct(isBooking(tab) ? 'booking' : 'shopos'); }, [tab]);
+  const groups = product === 'booking' ? [BOOKING_GROUP] : GROUPS;
+  const activeGroup = groups.find((g) => g.tabs.includes(tab))?.id;
   useEffect(() => { try { localStorage.setItem('shopos-admin-groups', JSON.stringify(open)); } catch { /* ignore */ } }, [open]);
   // A group is open if you opened it, or if the page you are on lives inside it.
   const isOpen = (id: string) => open[id] ?? (id === activeGroup);
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-      {GROUPS.map((g) => {
+      <div className="grid grid-cols-2 gap-1 p-1 mb-2 rounded-card bg-slate-800/60" role="tablist" aria-label="Product">
+        {([['shopos', 'ShopOS'], ['booking', 'Booking']] as const).map(([id, text]) => (
+          <button key={id} role="tab" aria-selected={product === id} onClick={() => { setProduct(id); if (id === 'booking' && !isBooking(tab)) onSelect('bk_apps'); if (id === 'shopos' && isBooking(tab)) onSelect('dashboard'); }}
+            className={`py-1.5 rounded-card text-xs font-semibold ${product === id ? 'bg-field-600 text-paper' : 'text-slate-400 hover:text-ink'}`}>{text}</button>
+        ))}
+      </div>
+      {groups.map((g) => {
         const GIcon = g.icon;
         const n = groupCount(badges, g.tabs);
         const expanded = isOpen(g.id);
