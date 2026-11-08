@@ -55,7 +55,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
     setBusy(true); setMsg(null); setErr(null);
     try {
       const r = await call({ action: 'create', name: form.name, kind: form.kind, ownerEmail: form.email, password: form.password, phone: form.phone, city: form.city, applicationId: form.appId });
-      setMsg(`Created. Page: ${SITE}/book/${r.slug} · Owner sign-in: ${r.email} / ${form.password} · Dashboard: ${SITE}/book-manage`);
+      setMsg(r.existing ? `Created. Page: ${SITE}/book/${r.slug} · ${r.email} already had a ShopOS account, so the booking business was added to it. They sign in with their usual password and open ${SITE}/book-manage` : `Created. Page: ${SITE}/book/${r.slug} · Owner sign-in: ${r.email} / ${form.password} · Dashboard: ${SITE}/book-manage`);
       setForm({ ...form, open: false, appId: undefined, name: '', email: '', phone: '', city: '', password: DEFAULT_PASSWORD });
       await load();
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
@@ -140,6 +140,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-black/60" onClick={() => setReset(null)} />
           <div className="relative card p-5 max-w-sm w-full space-y-2">
             <h3 className="font-display font-semibold text-lg">Reset {reset.name}'s password</h3>
+            <p className="text-xs text-slate-400">If this owner also has a ShopOS account on the same email, this changes the password for both.</p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setReset({ ...reset, pw: DEFAULT_PASSWORD })} className={`flex-1 text-sm rounded-lg border px-3 py-2 ${reset.pw === DEFAULT_PASSWORD ? 'border-field-600 text-field-600 font-medium' : 'border-slate-300 text-slate-500'}`}>Default</button>
               <button type="button" onClick={() => setReset({ ...reset, pw: '' })} className={`flex-1 text-sm rounded-lg border px-3 py-2 ${reset.pw !== DEFAULT_PASSWORD ? 'border-field-600 text-field-600 font-medium' : 'border-slate-300 text-slate-500'}`}>Custom</button>
