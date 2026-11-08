@@ -7,6 +7,7 @@ import { Centered } from './components/ui';
 import Packages from './pages/Packages';
 import BusinessTypes from './pages/BusinessTypes';
 import Bookings from './pages/Bookings';
+import BookingInsights from './pages/BookingInsights';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
 import { useBadges } from './lib/badges';
@@ -121,7 +122,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'M-Pesa', assistant: 'Assistant',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  bk_overview: 'Booking overview', bk_customers: 'Booking customers', bk_reports: 'Booking reports', bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -215,6 +216,9 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
+            {tab === 'bk_overview' && <BookingInsights supabase={supabase} view="overview" />}
+            {tab === 'bk_customers' && <BookingInsights supabase={supabase} view="customers" />}
+            {tab === 'bk_reports' && <BookingInsights supabase={supabase} view="reports" />}
             {tab === 'bk_apps' && <Bookings supabase={supabase} view="apps" />}
             {tab === 'bk_biz' && <Bookings supabase={supabase} view="biz" />}
             {tab === 'bk_bookings' && <Bookings supabase={supabase} view="bookings" />}
