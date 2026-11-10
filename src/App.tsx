@@ -7,6 +7,7 @@ import { Centered } from './components/ui';
 import Packages from './pages/Packages';
 import BusinessTypes from './pages/BusinessTypes';
 import Bookings from './pages/Bookings';
+import { Merged } from './components/Merged';
 import BookingAdmin, { type BkView } from './pages/BookingAdmin';
 import BookingInsights from './pages/BookingInsights';
 import DatabasePage from './pages/Database';
@@ -123,7 +124,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'M-Pesa', assistant: 'Assistant',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  bk_overview: 'Booking overview', bk_analytics: 'Booking analytics', bk_owners: 'Owners & logins', bk_catalog: 'Services & chairs', bk_today: 'Today & tomorrow', bk_revenue: 'Booking revenue', bk_quotes: 'Booking quotes', bk_activity: 'Booking activity', bk_customers: 'Booking customers', bk_reports: 'Booking reports', bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -190,12 +191,12 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
 
         <main className="flex-1 overflow-y-auto overscroll-contain p-5">
           <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-5xl' : 'max-w-3xl'}`}>
-            {tab === 'dashboard' && <Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />}
-            {tab === 'requests' && <OwnerRequests supabase={supabase} />}
+            {tab === 'dashboard' && <Merged id="dashboard" shop={<Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />} booking={[{ id: 'o', label: 'Overview', node: <BookingInsights supabase={supabase} view="overview" /> }, { id: 'a', label: 'Activity', node: <BookingAdmin supabase={supabase} view="activity" /> }]} />}
+            {tab === 'requests' && <Merged id="requests" shop={<OwnerRequests supabase={supabase} />} booking={[{ id: 'apps', label: 'Applications', node: <Bookings supabase={supabase} view="apps" /> }]} />}
             {tab === 'businesses' && (
               openBusinessId
                 ? <BusinessDetail supabase={supabase} businessId={openBusinessId} onBack={() => setOpenBusinessId(null)} />
-                : <Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />
+                : <Merged id="businesses" shop={<Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />} booking={[{ id: 'biz', label: 'Businesses', node: <Bookings supabase={supabase} view="biz" /> }, { id: 'own', label: 'Owners & logins', node: <BookingAdmin supabase={supabase} view="owners" /> }, { id: 'cat', label: 'Services & chairs', node: <BookingAdmin supabase={supabase} view="catalog" /> }]} />
             )}
             {tab === 'create' && (
               <div className="space-y-3">
@@ -211,19 +212,13 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
             {tab === 'permissions' && <RoleDefaultsPage supabase={supabase} />}
             {(tab === 'apps' || tab === 'releases' || tab === 'installers') && <AppsAndUpdates key={tab} supabase={supabase} start={tab === 'installers' ? 'installers' : 'updates'} badges={badges} />}
-            {tab === 'analytics' && <Analytics supabase={supabase} />}
+            {tab === 'analytics' && <Merged id="analytics" shop={<Analytics supabase={supabase} />} booking={[{ id: 'an', label: 'Analytics', node: <BookingAdmin supabase={supabase} view="analytics" /> }, { id: 'rep', label: 'Reports', node: <BookingInsights supabase={supabase} view="reports" /> }, { id: 'rev', label: 'Revenue', node: <BookingAdmin supabase={supabase} view="revenue" /> }]} />}
             {tab === 'monitor' && <Monitor supabase={supabase} />}
             {tab === 'mpesa' && <Mpesa supabase={supabase} />}
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
-            {(['bk_analytics', 'bk_owners', 'bk_catalog', 'bk_today', 'bk_revenue', 'bk_quotes', 'bk_activity'] as const).includes(tab as never) && <BookingAdmin supabase={supabase} view={tab.slice(3) as BkView} />}
-            {tab === 'bk_overview' && <BookingInsights supabase={supabase} view="overview" />}
-            {tab === 'bk_customers' && <BookingInsights supabase={supabase} view="customers" />}
-            {tab === 'bk_reports' && <BookingInsights supabase={supabase} view="reports" />}
-            {tab === 'bk_apps' && <Bookings supabase={supabase} view="apps" />}
-            {tab === 'bk_biz' && <Bookings supabase={supabase} view="biz" />}
-            {tab === 'bk_bookings' && <Bookings supabase={supabase} view="bookings" />}
+            {tab === 'bookings' && <Merged id="bookings" shop={<p className="text-sm text-slate-400">Bookings belong to the Booking side.</p>} booking={[{ id: 'all', label: 'All bookings', node: <Bookings supabase={supabase} view="bookings" /> }, { id: 'today', label: 'Today & tomorrow', node: <BookingAdmin supabase={supabase} view="today" /> }, { id: 'cust', label: 'Customers', node: <BookingInsights supabase={supabase} view="customers" /> }, { id: 'q', label: 'Quotes', node: <BookingAdmin supabase={supabase} view="quotes" /> }]} />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>
