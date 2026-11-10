@@ -58,10 +58,10 @@ const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'monitor', 'audit', 'settings'] },
 ];
 const BOOKING_GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
-  { id: 'bk_overview_g', label: 'Overview', icon: LayoutDashboard, tabs: ['bk_overview', 'bk_analytics', 'bk_activity'] },
-  { id: 'bk_people_g', label: 'Businesses & people', icon: Briefcase, tabs: ['bk_apps', 'bk_biz', 'bk_owners', 'bk_customers', 'bk_catalog'] },
-  { id: 'bk_book_g', label: 'Bookings', icon: CalendarCheck, tabs: ['bk_bookings', 'bk_today'] },
-  { id: 'bk_money_g', label: 'Money & reports', icon: Wallet, tabs: ['bk_revenue', 'bk_quotes', 'bk_reports'] },
+  { id: 'bk_overview_g', label: 'Booking · Overview', icon: CalendarCheck, tabs: ['bk_overview', 'bk_analytics', 'bk_activity'] },
+  { id: 'bk_people_g', label: 'Booking · Businesses & people', icon: CalendarCheck, tabs: ['bk_apps', 'bk_biz', 'bk_owners', 'bk_customers', 'bk_catalog'] },
+  { id: 'bk_book_g', label: 'Booking · Bookings', icon: CalendarCheck, tabs: ['bk_bookings', 'bk_today'] },
+  { id: 'bk_money_g', label: 'Booking · Money & reports', icon: CalendarCheck, tabs: ['bk_revenue', 'bk_quotes', 'bk_reports'] },
 ];
 const isBooking = (t: Tab) => BOOKING_GROUPS.some((g) => g.tabs.includes(t));
 const label = (t: Tab) => TABS.find(([k]) => k === t)![1];
@@ -72,21 +72,13 @@ function NavList({ tab, onSelect, badges }: { tab: Tab; onSelect: (tab: Tab) => 
     try { return JSON.parse(localStorage.getItem('shopos-admin-groups') ?? '{}'); } catch { return {}; }
   });
   const [sound, setSound] = useState(soundOn());
-  const [product, setProduct] = useState<'shopos' | 'booking'>(isBooking(tab) ? 'booking' : 'shopos');
-  useEffect(() => { setProduct(isBooking(tab) ? 'booking' : 'shopos'); }, [tab]);
-  const groups = product === 'booking' ? BOOKING_GROUPS : GROUPS;
+  const groups = [...GROUPS, ...BOOKING_GROUPS];
   const activeGroup = groups.find((g) => g.tabs.includes(tab))?.id;
   useEffect(() => { try { localStorage.setItem('shopos-admin-groups', JSON.stringify(open)); } catch { /* ignore */ } }, [open]);
   // A group is open if you opened it, or if the page you are on lives inside it.
   const isOpen = (id: string) => open[id] ?? (id === activeGroup);
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-      <div className="grid grid-cols-2 gap-1 p-1 mb-2 rounded-card bg-slate-800/60" role="tablist" aria-label="Product">
-        {([['shopos', 'ShopOS'], ['booking', 'Booking']] as const).map(([id, text]) => (
-          <button key={id} role="tab" aria-selected={product === id} onClick={() => { setProduct(id); if (id === 'booking' && !isBooking(tab)) onSelect('bk_overview'); if (id === 'shopos' && isBooking(tab)) onSelect('dashboard'); }}
-            className={`py-1.5 rounded-card text-xs font-semibold ${product === id ? 'bg-field-600 text-paper' : 'text-slate-400 hover:text-ink'}`}>{text}</button>
-        ))}
-      </div>
       {groups.map((g) => {
         const GIcon = g.icon;
         const n = groupCount(badges, g.tabs);

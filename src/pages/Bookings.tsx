@@ -95,7 +95,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
     setBusy(false); if (error) { setErr(friendlyError(error, 'Could not save.')); return; } setEdit(null); await load();
   }
   function exportCsv() {
-    const rows = [['Name', 'Type', 'Status', 'City', 'Phone', 'Email', 'Bookings', 'Paid revenue', 'Link'], ...biz.map((b) => [b.name, b.kind, b.status, b.city ?? '', b.phone ?? '', b.email ?? '', String(b.bookings), String(stats[b.id]?.revenue ?? 0), `${SITE}/book/${b.slug}`])];
+    const rows = [['Name', 'Type', 'Status', 'City', 'Phone', 'Email', 'Bookings', 'Paid revenue', 'Link'], ...(biz ?? []).map((b) => [b.name, b.kind, b.status, b.city ?? '', b.phone ?? '', b.email ?? '', String(b.bookings), String(stats[b.id]?.revenue ?? 0), `${SITE}/book/${b.slug}`])];
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' })); a.download = 'booking-businesses.csv'; a.click();
   }
   async function rejectApp(id: string) { await supabase.from('bk_applications').update({ status: 'rejected' }).eq('id', id); await load(); }
@@ -132,9 +132,11 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
           <div className="flex flex-wrap gap-2">{['all', 'pending', 'confirmed', 'completed', 'cancelled', 'no_show'].map((f) => <button key={f} onClick={() => setStF(f)} className={`px-3 py-1 rounded-full text-xs border capitalize ${stF === f ? 'bg-field-600 text-white border-field-600' : 'border-slate-300 text-slate-600'}`}>{f.replace('_', ' ')}</button>)}</div>
           <input className="input" placeholder="Search name, phone, code or business" value={q} onChange={(e) => setQ(e.target.value)} />
           {all === null ? <Skeleton rows={4} /> : all.length === 0 ? <EmptyState message="No bookings yet." /> : all.filter((r) => (stF === 'all' || r.status === stF) && (!q || `${r.customer_name} ${r.customer_phone} ${r.code} ${r.bk_businesses?.name ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((r) => (
-            <Card key={r.id} className="p-3 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setSel(r)}>
+            <Card key={r.id} className="p-0">
+            <div role="button" tabIndex={0} onClick={() => setSel(r)} onKeyDown={(e) => { if (e.key === 'Enter') setSel(r); }} className="p-3 flex items-center justify-between gap-3 cursor-pointer">
               <div className="min-w-0"><div className="text-sm font-medium">{r.customer_name} <span className="text-slate-400 font-normal">· {r.customer_phone}</span></div><div className="text-xs text-slate-500">{r.bk_businesses?.name ?? 'Business'} · {new Date(r.starts_at).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })}{r.seats > 1 ? ` · ${r.seats} seats` : ''}</div></div>
               <div className="text-right shrink-0"><div className="text-xs">{r.status.replace('_', ' ')}</div><div className="text-xs text-slate-400">KES {Number(r.price).toLocaleString()}{r.paid ? ' · paid' : ''}</div></div>
+            </div>
             </Card>))}
         </>
       )}
