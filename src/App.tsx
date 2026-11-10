@@ -7,6 +7,7 @@ import { Centered } from './components/ui';
 import Packages from './pages/Packages';
 import BusinessTypes from './pages/BusinessTypes';
 import Bookings from './pages/Bookings';
+import BookingAdmin, { type BkView } from './pages/BookingAdmin';
 import BookingInsights from './pages/BookingInsights';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
@@ -122,7 +123,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'M-Pesa', assistant: 'Assistant',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
-  bk_overview: 'Booking overview', bk_customers: 'Booking customers', bk_reports: 'Booking reports', bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
+  bk_overview: 'Booking overview', bk_analytics: 'Booking analytics', bk_owners: 'Owners & logins', bk_catalog: 'Services & chairs', bk_today: 'Today & tomorrow', bk_revenue: 'Booking revenue', bk_quotes: 'Booking quotes', bk_activity: 'Booking activity', bk_customers: 'Booking customers', bk_reports: 'Booking reports', bk_apps: 'Booking applications', bk_biz: 'Booking businesses', bk_bookings: 'All bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
@@ -216,6 +217,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
+            {(['bk_analytics', 'bk_owners', 'bk_catalog', 'bk_today', 'bk_revenue', 'bk_quotes', 'bk_activity'] as const).includes(tab as never) && <BookingAdmin supabase={supabase} view={tab.slice(3) as BkView} />}
             {tab === 'bk_overview' && <BookingInsights supabase={supabase} view="overview" />}
             {tab === 'bk_customers' && <BookingInsights supabase={supabase} view="customers" />}
             {tab === 'bk_reports' && <BookingInsights supabase={supabase} view="reports" />}

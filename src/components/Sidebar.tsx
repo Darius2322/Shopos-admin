@@ -3,7 +3,7 @@ import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, 
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 
-export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bk_overview' | 'bk_customers' | 'bk_reports' | 'bk_apps' | 'bk_biz' | 'bk_bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
+export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bk_overview' | 'bk_customers' | 'bk_reports' | 'bk_apps' | 'bk_analytics' | 'bk_owners' | 'bk_catalog' | 'bk_today' | 'bk_revenue' | 'bk_quotes' | 'bk_activity' | 'bk_biz' | 'bk_bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -14,6 +14,13 @@ export const TABS: [Tab, string, any][] = [
   ['packages', 'Packages', Package],
   ['businesstypes', 'Business Types', Palette],
   ['bk_overview', 'Overview', LayoutDashboard],
+  ['bk_analytics', 'Analytics', BarChart3],
+  ['bk_owners', 'Owners & logins', ShieldCheck],
+  ['bk_catalog', 'Services & chairs', Package],
+  ['bk_today', 'Today & tomorrow', CalendarCheck],
+  ['bk_revenue', 'Revenue', Wallet],
+  ['bk_quotes', 'Quotes', ScrollText],
+  ['bk_activity', 'Activity', Sparkles],
   ['bk_apps', 'Applications', Users],
   ['bk_biz', 'Booking businesses', Store],
   ['bk_bookings', 'All bookings', CalendarCheck],
@@ -50,8 +57,13 @@ const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'monitor', 'audit', 'settings'] },
 ];
-const BOOKING_GROUP = { id: 'booking', label: 'ShopOS Booking', icon: CalendarCheck, tabs: ['bk_overview', 'bk_apps', 'bk_biz', 'bk_bookings', 'bk_customers', 'bk_reports'] as Tab[] };
-const isBooking = (t: Tab) => BOOKING_GROUP.tabs.includes(t);
+const BOOKING_GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
+  { id: 'bk_overview_g', label: 'Overview', icon: LayoutDashboard, tabs: ['bk_overview', 'bk_analytics', 'bk_activity'] },
+  { id: 'bk_people_g', label: 'Businesses & people', icon: Briefcase, tabs: ['bk_apps', 'bk_biz', 'bk_owners', 'bk_customers', 'bk_catalog'] },
+  { id: 'bk_book_g', label: 'Bookings', icon: CalendarCheck, tabs: ['bk_bookings', 'bk_today'] },
+  { id: 'bk_money_g', label: 'Money & reports', icon: Wallet, tabs: ['bk_revenue', 'bk_quotes', 'bk_reports'] },
+];
+const isBooking = (t: Tab) => BOOKING_GROUPS.some((g) => g.tabs.includes(t));
 const label = (t: Tab) => TABS.find(([k]) => k === t)![1];
 const iconOf = (t: Tab) => TABS.find(([k]) => k === t)![2];
 
@@ -62,7 +74,7 @@ function NavList({ tab, onSelect, badges }: { tab: Tab; onSelect: (tab: Tab) => 
   const [sound, setSound] = useState(soundOn());
   const [product, setProduct] = useState<'shopos' | 'booking'>(isBooking(tab) ? 'booking' : 'shopos');
   useEffect(() => { setProduct(isBooking(tab) ? 'booking' : 'shopos'); }, [tab]);
-  const groups = product === 'booking' ? [BOOKING_GROUP] : GROUPS;
+  const groups = product === 'booking' ? BOOKING_GROUPS : GROUPS;
   const activeGroup = groups.find((g) => g.tabs.includes(tab))?.id;
   useEffect(() => { try { localStorage.setItem('shopos-admin-groups', JSON.stringify(open)); } catch { /* ignore */ } }, [open]);
   // A group is open if you opened it, or if the page you are on lives inside it.
