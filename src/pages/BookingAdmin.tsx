@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Download } from 'lucide-react';
+import { Download, Trash2, Eye, EyeOff, Star } from 'lucide-react';
 import { Card, ErrorText, Skeleton, EmptyState } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
 
 type R = Record<string, any>;
-export type BkView = 'analytics' | 'owners' | 'catalog' | 'today' | 'revenue' | 'quotes' | 'activity';
+export type BkView = 'analytics' | 'owners' | 'catalog' | 'today' | 'revenue' | 'quotes' | 'activity' | 'plans' | 'broadcast' | 'blocked' | 'reviews';
 const KIND: Record<string, string> = { salon: 'Salon', barbershop: 'Barbershop', beauty: 'Beauty studio', spa: 'Spa & massage', bus: 'Bus & shuttle', clinic: 'Clinic', carwash: 'Car wash', fitness: 'Fitness & classes', custom: 'Custom' };
 const TZ = 'Africa/Nairobi';
 const ymd = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
@@ -43,6 +43,12 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
   const [staff, setStaff] = useState<R[]>([]);
   const [quotes, setQuotes] = useState<R[]>([]);
   const [apps, setApps] = useState<R[]>([]);
+  const [reviews, setReviews] = useState<R[]>([]);
+  const [blocked, setBlocked] = useState<R[]>([]);
+  const [casts, setCasts] = useState<R[]>([]);
+  const [tick, setTick] = useState(0);
+  const [form, setForm] = useState({ a: '', b: '' });
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [days, setDays] = useState(30);
   const [q, setQ] = useState('');
@@ -50,7 +56,7 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
 
   useEffect(() => {
     (async () => {
-      const [b, bz, o, s, st, qu, a] = await Promise.all([
+      const [b, bz, o, s, st, qu, a, rv, bl, bc] = await Promise.all([
         supabase.from('bk_bookings').select('*, bk_businesses(name, kind), bk_services(name), bk_staff(name)').order('starts_at', { ascending: false }).limit(5000),
         supabase.from('bk_businesses').select('*').order('created_at', { ascending: false }),
         supabase.rpc('bk_admin_owners'),
@@ -58,11 +64,14 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
         supabase.from('bk_staff').select('*, bk_businesses(name)').order('sort'),
         supabase.from('bk_quotes').select('*, bk_businesses(name)').order('created_at', { ascending: false }).limit(500),
         supabase.from('bk_applications').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('bk_reviews').select('*, bk_businesses(name)').order('created_at', { ascending: false }).limit(300),
+        supabase.from('bk_blocked_phones').select('*, bk_businesses(name)').order('created_at', { ascending: false }).limit(300),
+        supabase.from('bk_broadcasts').select('*').order('created_at', { ascending: false }).limit(50),
       ]);
       if (b.error) { setErr(friendlyError(b.error, 'Could not load booking data.')); return; }
-      setBk((b.data ?? []) as R[]); setBiz((bz.data ?? []) as R[]); setOwners((o.data ?? []) as R[]); setSvc((s.data ?? []) as R[]); setStaff((st.data ?? []) as R[]); setQuotes((qu.data ?? []) as R[]); setApps((a.data ?? []) as R[]);
+      setBk((b.data ?? []) as R[]); setBiz((bz.data ?? []) as R[]); setOwners((o.data ?? []) as R[]); setSvc((s.data ?? []) as R[]); setStaff((st.data ?? []) as R[]); setQuotes((qu.data ?? []) as R[]); setApps((a.data ?? []) as R[]); setReviews((rv.data ?? []) as R[]); setBlocked((bl.data ?? []) as R[]); setCasts((bc.data ?? []) as R[]);
     })();
-  }, [supabase]);
+  }, [supabase, tick]);
 
   const range = useMemo(() => { const from = Date.now() - days * 86400000; return (bk ?? []).filter((r) => { const t = new Date(r.starts_at).getTime(); return t >= from && t <= Date.now() + 90 * 86400000; }); }, [bk, days]);
 
@@ -71,6 +80,72 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
   const live = (r: R) => !['cancelled', 'no_show'].includes(r.status);
   const paidSum = (rows: R[]) => rows.filter((r) => r.paid && live(r)).reduce((a, r) => a + Number(r.price), 0);
   const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '0%');
+
+  /* ───────── Plans and fees */
+  if (view === 'plans') {
+    const mStart = new Date(); mStart.setDate(1); mStart.setHours(0, 0, 0, 0);
+    const limit = (p: string) => (p === 'free' ? 60 : p === 'basic' ? 300 : null);
+    const rows = biz.map((b) => { const mine = bk.filter((r) => r.business_id === b.id && live(r) && new Date(r.created_at) >= mStart); const paid = bk.filter((r) => r.business_id === b.id && r.paid && live(r) && new Date(r.starts_at) >= mStart).reduce((a, r) => a + Number(r.price), 0); return { b, n: mine.length, paid, fee: Math.round((paid * Number(b.fee_pct ?? 0)) / 100) }; });
+    const save = async (id: string, p: R) => { const { error } = await supabase.from('bk_businesses').update(p).eq('id', id); if (error) setErr(friendlyError(error, 'Could not save.')); else setTick((x) => x + 1); };
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2"><Kpi l="Free" v={biz.filter((b) => b.plan === 'free').length} sub="60 bookings a month" /><Kpi l="Basic" v={biz.filter((b) => b.plan === 'basic').length} sub="300 a month" /><Kpi l="Pro" v={biz.filter((b) => b.plan === 'pro').length} sub="unlimited" /><Kpi l="Fees due this month" v={kes(rows.reduce((a, r) => a + r.fee, 0))} /></div>
+        <p className="text-xs text-slate-400">When a business reaches its monthly limit, customers see a message to call the business instead. Fee % is worked out on bookings the owner marked as paid this month.</p>
+        {rows.length === 0 ? <EmptyState message="No booking businesses yet." /> : rows.map(({ b, n, paid, fee }) => (
+          <Card key={b.id} className="p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2"><div className="text-sm font-medium">{b.name}</div><span className="text-xs text-slate-400">{n}{limit(b.plan) ? ` / ${limit(b.plan)}` : ''} bookings this month</span></div>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <label className="inline-flex items-center gap-1.5">Plan<select className="input !py-1 !w-28" value={b.plan} onChange={(e) => save(b.id, { plan: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="pro">Pro</option></select></label>
+              <label className="inline-flex items-center gap-1.5">Fee %<input className="input !py-1 !w-20" type="number" min={0} max={100} defaultValue={Number(b.fee_pct ?? 0)} onBlur={(e) => { const v = Math.max(0, Math.min(100, +e.target.value || 0)); if (v !== Number(b.fee_pct ?? 0)) void save(b.id, { fee_pct: v }); }} /></label>
+              <span className="text-slate-400">Paid this month {kes(paid)}{fee ? ` · fee ${kes(fee)}` : ''}</span>
+            </div>
+          </Card>))}
+      </div>
+    );
+  }
+
+  /* ───────── Broadcast to all booking owners */
+  if (view === 'broadcast') {
+    const send = async () => { setBusy(true); const { error } = await supabase.from('bk_broadcasts').insert({ title: form.a.trim(), body: form.b.trim() }); setBusy(false); if (error) { setErr(friendlyError(error, 'Could not send.')); return; } setForm({ a: '', b: '' }); setTick((x) => x + 1); };
+    return (
+      <div className="space-y-3">
+        <Card className="p-4 space-y-2"><h3 className="font-medium text-sm">New message to every booking owner</h3><p className="text-xs text-slate-400">It shows as a banner at the top of their dashboard until they dismiss it.</p>
+          <input className="input" placeholder="Title" value={form.a} onChange={(e) => setForm({ ...form, a: e.target.value })} maxLength={80} />
+          <textarea className="input" rows={3} placeholder="Message" value={form.b} onChange={(e) => setForm({ ...form, b: e.target.value })} maxLength={600} />
+          <button onClick={send} disabled={busy || form.a.trim().length < 3 || form.b.trim().length < 3} className="btn-primary text-sm">{busy ? 'Sending…' : 'Send to all'}</button></Card>
+        {casts.map((c) => <Card key={c.id} className="p-3 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-sm font-medium">{c.title}</div><div className="text-xs text-slate-500 whitespace-pre-wrap">{c.body}</div><div className="text-[10px] text-slate-400 mt-1">{ago(c.created_at)}</div></div><button className="text-slate-400" aria-label="Delete" onClick={async () => { await supabase.from('bk_broadcasts').delete().eq('id', c.id); setTick((x) => x + 1); }}><Trash2 className="w-4 h-4" /></button></Card>)}
+      </div>
+    );
+  }
+
+  /* ───────── Blocked numbers (across every business) */
+  if (view === 'blocked') {
+    const add = async () => { const ph = form.a.replace(/\D/g, '').slice(-9); if (ph.length < 9) return; setBusy(true); const { error } = await supabase.from('bk_blocked_phones').insert({ business_id: null, phone: ph, reason: form.b.trim() || 'Blocked by ShopOS' }); setBusy(false); if (error) { setErr(friendlyError(error, 'Could not block.')); return; } setForm({ a: '', b: '' }); setTick((x) => x + 1); };
+    return (
+      <div className="space-y-3">
+        <Card className="p-4 space-y-2"><h3 className="font-medium text-sm">Block a phone number everywhere</h3><p className="text-xs text-slate-400">Use it for abuse or fake bookings. The number can no longer book at any business. Owners can also block numbers at their own business.</p>
+          <div className="grid grid-cols-2 gap-2"><input className="input" placeholder="Phone, e.g. 0712345678" inputMode="tel" value={form.a} onChange={(e) => setForm({ ...form, a: e.target.value })} /><input className="input" placeholder="Reason (optional)" value={form.b} onChange={(e) => setForm({ ...form, b: e.target.value })} /></div>
+          <button onClick={add} disabled={busy || form.a.replace(/\D/g, '').length < 9} className="btn-primary text-sm">Block number</button></Card>
+        {blocked.length === 0 ? <EmptyState message="No blocked numbers." /> : blocked.map((x) => <Card key={x.id} className="p-3 flex items-center justify-between gap-3"><div><div className="text-sm font-medium">{x.phone}</div><div className="text-xs text-slate-500">{x.business_id ? `At ${x.bk_businesses?.name ?? 'a business'}` : 'Everywhere'}{x.reason ? ` · ${x.reason}` : ''} · {ago(x.created_at)}</div></div><button className="text-slate-400" aria-label="Unblock" onClick={async () => { await supabase.from('bk_blocked_phones').delete().eq('id', x.id); setTick((n) => n + 1); }}><Trash2 className="w-4 h-4" /></button></Card>)}
+      </div>
+    );
+  }
+
+  /* ───────── Reviews across all businesses */
+  if (view === 'reviews') {
+    const shown = reviews.filter((r) => !r.hidden); const avg = shown.length ? shown.reduce((a, r) => a + r.rating, 0) / shown.length : 0;
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2"><Kpi l="Reviews" v={reviews.length} /><Kpi l="Average" v={avg ? avg.toFixed(1) : '–'} /></div>
+        {reviews.length === 0 ? <EmptyState message="No reviews yet." /> : reviews.map((r) => (
+          <Card key={r.id} className={`p-3 ${r.hidden ? 'opacity-60' : ''}`}>
+            <div className="flex items-center justify-between gap-2"><div className="text-sm"><span className="inline-flex">{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`w-3.5 h-3.5 ${i <= r.rating ? 'fill-current' : 'opacity-30'}`} />)}</span> <span className="text-xs text-slate-500 ml-1">{r.bk_businesses?.name} · {r.customer_name} · {ago(r.created_at)}</span></div>
+              <button className="btn-secondary text-xs !py-1 inline-flex items-center gap-1" onClick={async () => { await supabase.from('bk_reviews').update({ hidden: !r.hidden }).eq('id', r.id); setTick((x) => x + 1); }}>{r.hidden ? <><Eye className="w-3 h-3" />Show</> : <><EyeOff className="w-3 h-3" />Hide</>}</button></div>
+            {r.comment && <p className="text-sm text-slate-500 mt-1">{r.comment}</p>}
+          </Card>))}
+      </div>
+    );
+  }
 
   /* ───────── Analytics */
   if (view === 'analytics') {

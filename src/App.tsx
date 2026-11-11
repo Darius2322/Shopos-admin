@@ -196,7 +196,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'businesses' && (
               openBusinessId
                 ? <BusinessDetail supabase={supabase} businessId={openBusinessId} onBack={() => setOpenBusinessId(null)} />
-                : <Merged id="businesses" shop={<Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />} booking={[{ id: 'biz', label: 'Businesses', node: <Bookings supabase={supabase} view="biz" /> }, { id: 'own', label: 'Owners & logins', node: <BookingAdmin supabase={supabase} view="owners" /> }, { id: 'cat', label: 'Services & chairs', node: <BookingAdmin supabase={supabase} view="catalog" /> }]} />
+                : <Merged id="businesses" shop={<Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />} booking={[{ id: 'biz', label: 'Businesses', node: <Bookings supabase={supabase} view="biz" /> }, { id: 'own', label: 'Owners & logins', node: <BookingAdmin supabase={supabase} view="owners" /> }, { id: 'cat', label: 'Services & chairs', node: <BookingAdmin supabase={supabase} view="catalog" /> }, { id: 'plans', label: 'Plans & fees', node: <BookingAdmin supabase={supabase} view="plans" /> }]} />
             )}
             {tab === 'create' && (
               <div className="space-y-3">
@@ -218,7 +218,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Packages supabase={supabase} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
-            {tab === 'bookings' && <Merged id="bookings" shop={<p className="text-sm text-slate-400">Bookings belong to the Booking side.</p>} booking={[{ id: 'all', label: 'All bookings', node: <Bookings supabase={supabase} view="bookings" /> }, { id: 'today', label: 'Today & tomorrow', node: <BookingAdmin supabase={supabase} view="today" /> }, { id: 'cust', label: 'Customers', node: <BookingInsights supabase={supabase} view="customers" /> }, { id: 'q', label: 'Quotes', node: <BookingAdmin supabase={supabase} view="quotes" /> }]} />}
+            {tab === 'bookings' && <Merged id="bookings" shop={<p className="text-sm text-slate-400">Bookings belong to the Booking side.</p>} booking={[{ id: 'all', label: 'All bookings', node: <Bookings supabase={supabase} view="bookings" /> }, { id: 'today', label: 'Today & tomorrow', node: <BookingAdmin supabase={supabase} view="today" /> }, { id: 'cust', label: 'Customers', node: <BookingInsights supabase={supabase} view="customers" /> }, { id: 'q', label: 'Quotes', node: <BookingAdmin supabase={supabase} view="quotes" /> }, { id: 'rv', label: 'Reviews', node: <BookingAdmin supabase={supabase} view="reviews" /> }, { id: 'bc', label: 'Broadcast', node: <BookingAdmin supabase={supabase} view="broadcast" /> }, { id: 'bl', label: 'Blocked numbers', node: <BookingAdmin supabase={supabase} view="blocked" /> }]} />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
             {tab === 'softdelete' && <SoftDelete supabase={supabase} />}
           </div>
