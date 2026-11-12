@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Check, X, Copy, KeyRound, Plus, ExternalLink, Pause, Play, Trash2, Pencil, Download } from 'lucide-react';
+import { Check, X, Copy, KeyRound, Plus, ExternalLink, Pause, Play, Trash2, Pencil, Download, ChevronRight, ArrowLeft, Phone, Mail, MessageCircle, Star, Eye, EyeOff } from 'lucide-react';
 import { Card, ErrorText, Skeleton, EmptyState } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
 
@@ -28,6 +28,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
   const [del, setDel] = useState<{ id: string; name: string; typed: string } | null>(null);
   const [edit, setEdit] = useState<{ id: string; name: string; phone: string; city: string; email: string } | null>(null);
   const [stats, setStats] = useState<Record<string, { revenue: number; upcoming: number }>>({});
+  const [openBiz, setOpenBiz] = useState<Biz | null>(null); const [bTab, setBTab] = useState('overview');
   const [reset, setReset] = useState<{ id: string; name: string; pw: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -141,7 +142,11 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
         </>
       )}
 
-      {tab === 'biz' && (
+      {tab === 'biz' && openBiz && <BizDetail b={openBiz} supabase={supabase} stats={stats[openBiz.id]} tab={bTab} onTab={setBTab} onBack={() => setOpenBiz(null)}
+        onStatus={(st) => { void setStatus(openBiz.id, st).then(() => setOpenBiz((o) => (o ? { ...o, status: st } : o))); }}
+        onEdit={() => setEdit({ id: openBiz.id, name: openBiz.name, phone: openBiz.phone ?? '', city: openBiz.city ?? '', email: openBiz.email ?? '' })}
+        onReset={() => setReset({ id: openBiz.id, name: openBiz.name, pw: DEFAULT_PASSWORD })} onDelete={() => setDel({ id: openBiz.id, name: openBiz.name, typed: '' })} />}
+      {tab === 'biz' && !openBiz && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             {(['all', 'pending', 'active', 'suspended', 'rejected'] as const).map((f) => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-full text-xs border capitalize ${filter === f ? 'bg-field-600 text-white border-field-600' : 'border-slate-300 text-slate-600'}`}>{f}{f !== 'all' ? ` (${biz.filter((b) => b.status === f).length})` : ''}</button>)}
@@ -149,24 +154,19 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
           </div>
           <input className="input" placeholder="Search business, email or town" value={q} onChange={(e) => setQ(e.target.value)} />
           {biz.length === 0 ? <EmptyState message="No booking businesses yet." /> : biz.filter((b) => (filter === 'all' || b.status === filter) && (!q || `${b.name} ${b.email ?? ''} ${b.city ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((b) => (
-            <Card key={b.id} className="p-4">
+            <Card key={b.id} className="p-0"><div role="button" tabIndex={0} onClick={() => { setOpenBiz(b); setBTab('overview'); }} onKeyDown={(e) => { if (e.key === 'Enter') { setOpenBiz(b); setBTab('overview'); } }} className="p-4 cursor-pointer hover:bg-slate-800/20 rounded-xl">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0"><div className="font-medium">{b.name} <span className="text-xs text-slate-400">· {KINDS.find((k) => k[0] === b.kind)?.[1] ?? b.kind}</span></div>
                   <div className="text-sm text-slate-500">{b.email ?? ''}{b.city ? ` · ${b.city}` : ''}{b.phone ? ` · ${b.phone}` : ''}</div>
-                  <a href={`${SITE}/book/${b.slug}`} target="_blank" rel="noreferrer" className="text-xs text-field-700 inline-flex items-center gap-1 mt-1">/book/{b.slug}<ExternalLink className="w-3 h-3" /></a></div>
+                  <a href={`${SITE}/book/${b.slug}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs text-field-700 inline-flex items-center gap-1 mt-1">/book/{b.slug}<ExternalLink className="w-3 h-3" /></a></div>
                 <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${b.status === 'active' ? 'bg-field-50 text-field-700' : b.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rust-500/10 text-rust-500'}`}>{b.status}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs"><div className="rounded-lg bg-slate-100/60 py-2"><b className="block text-sm">{b.bookings}</b>Bookings</div><div className="rounded-lg bg-slate-100/60 py-2"><b className="block text-sm">{stats[b.id]?.upcoming ?? 0}</b>Upcoming</div><div className="rounded-lg bg-slate-100/60 py-2"><b className="block text-sm">{(stats[b.id]?.revenue ?? 0).toLocaleString()}</b>Paid (KES)</div></div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {(b.status === 'pending' || b.status === 'rejected') && <button onClick={() => setStatus(b.id, 'active')} className="btn-primary text-xs !py-1 inline-flex items-center gap-1"><Check className="w-3 h-3" />Approve</button>}
-                {b.status === 'pending' && <button onClick={() => setStatus(b.id, 'rejected')} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><X className="w-3 h-3" />Reject</button>}
-                {b.status === 'active' && <button onClick={() => setStatus(b.id, 'suspended')} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><Pause className="w-3 h-3" />Suspend</button>}
-                {b.status === 'suspended' && <button onClick={() => setStatus(b.id, 'active')} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><Play className="w-3 h-3" />Reactivate</button>}
-                <button onClick={() => setEdit({ id: b.id, name: b.name, phone: b.phone ?? '', city: b.city ?? '', email: b.email ?? '' })} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><Pencil className="w-3 h-3" />Edit</button>
-                <button onClick={() => setReset({ id: b.id, name: b.name, pw: DEFAULT_PASSWORD })} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><KeyRound className="w-3 h-3" />Reset password</button>
-                <button onClick={() => setDel({ id: b.id, name: b.name, typed: '' })} className="text-xs !py-1 px-3 rounded-lg border border-rust-500/40 text-rust-500 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />Delete</button>
-              </div>
-            </Card>))}
+              {(b.status === 'pending' || b.status === 'rejected') && <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setStatus(b.id, 'active')} className="btn-primary text-xs !py-1 inline-flex items-center gap-1"><Check className="w-3 h-3" />Approve</button>
+                {b.status === 'pending' && <button onClick={() => setStatus(b.id, 'rejected')} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><X className="w-3 h-3" />Reject</button>}</div>}
+              <div className="flex items-center justify-end text-xs text-slate-400 mt-2">Open details <ChevronRight className="w-3.5 h-3.5" /></div>
+            </div></Card>))}
         </>
       )}
 
@@ -239,6 +239,89 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
             </div>
             <button onClick={() => setSel(null)} className="btn-secondary w-full">Close</button>
           </div></div>)}
+    </div>
+  );
+}
+
+
+type RR = Record<string, any>;
+const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
+/** One business, on its own page: profile, quick actions and sub menus. */
+function BizDetail({ b, supabase, stats, tab, onTab, onBack, onStatus, onEdit, onReset, onDelete }: {
+  b: Biz; supabase: SupabaseClient; stats?: { revenue: number; upcoming: number }; tab: string; onTab: (t: string) => void; onBack: () => void;
+  onStatus: (s: string) => void; onEdit: () => void; onReset: () => void; onDelete: () => void;
+}) {
+  const [data, setData] = useState<Record<string, RR[] | null>>({});
+  const [full, setFull] = useState<RR | null>(null);
+  useEffect(() => { void supabase.from('bk_businesses').select('*').eq('id', b.id).maybeSingle().then((r) => setFull((r.data as RR) ?? null)); }, [supabase, b.id]);
+  const loadTab = useCallback(async (t: string) => {
+    const tbl: Record<string, [string, string]> = { bookings: ['bk_bookings', 'starts_at'], services: ['bk_services', 'created_at'], team: ['bk_staff', 'created_at'], reviews: ['bk_reviews', 'created_at'] };
+    const x = tbl[t]; if (!x) return;
+    const { data: d } = await supabase.from(x[0]).select('*').eq('business_id', b.id).order(x[1], { ascending: false }).limit(100);
+    setData((o) => ({ ...o, [t]: (d ?? []) as RR[] }));
+  }, [supabase, b.id]);
+  useEffect(() => { void loadTab(tab); }, [tab, loadTab]);
+  async function hideReview(id: string, hidden: boolean) { await supabase.from('bk_reviews').update({ hidden, ...(hidden ? { hide_requested: false } : {}) }).eq('id', id); void loadTab('reviews'); }
+  const phone = (b.phone ?? '').replace(/[^\d+]/g, '');
+  const wa = phone.replace(/^\+/, '').replace(/^0/, '254');
+  const reviews = data.reviews ?? [];
+  const reqs = reviews.filter((r) => r.hide_requested && !r.hidden).length;
+  const tabs: [string, string][] = [['overview', 'Overview'], ['bookings', 'Bookings'], ['services', 'Services & chairs'], ['team', 'Team'], ['reviews', reqs ? `Reviews (${reqs} to review)` : 'Reviews'], ['manage', 'Manage']];
+  const col = b.status === 'active' ? 'bg-field-50 text-field-700' : b.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rust-500/10 text-rust-500';
+  const Row = ({ k, v }: { k: string; v: ReactNode }) => <div className="flex justify-between gap-3 text-sm py-1.5 border-b border-slate-700/20"><span className="text-slate-500">{k}</span><span className="text-right break-all">{v ?? '—'}</span></div>;
+  const Act = ({ icon, label, href, onClick, danger }: { icon: ReactNode; label: string; href?: string; onClick?: () => void; danger?: boolean }) => {
+    const cls = `flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-xs min-w-[64px] ${danger ? 'border-rust-500/40 text-rust-500' : 'border-slate-600/40'}`;
+    return href ? <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className={cls}>{icon}{label}</a> : <button type="button" onClick={onClick} className={cls}>{icon}{label}</button>;
+  };
+  return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-slate-500"><ArrowLeft className="w-4 h-4" />All businesses</button>
+      <Card className="p-4 flex items-center gap-3">
+        <div className="w-14 h-14 rounded-full bg-field-600 text-white flex items-center justify-center text-lg font-semibold shrink-0 overflow-hidden">{full?.logo_url ? <img src={full.logo_url} alt="" className="w-full h-full object-cover" /> : initials(b.name)}</div>
+        <div className="min-w-0 flex-1"><div className="font-display font-semibold text-lg truncate">{b.name}</div><div className="text-xs text-slate-500">{KINDS.find((k) => k[0] === b.kind)?.[1] ?? b.kind}{b.city ? ` · ${b.city}` : ''}</div></div>
+        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${col}`}>{b.status}</span>
+      </Card>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <Act icon={<ExternalLink className="w-5 h-5" />} label="Open page" href={`${SITE}/book/${b.slug}`} />
+        {phone && <Act icon={<Phone className="w-5 h-5" />} label="Call" href={`tel:${phone}`} />}
+        {phone && <Act icon={<MessageCircle className="w-5 h-5" />} label="WhatsApp" href={`https://wa.me/${wa}`} />}
+        {b.email && <Act icon={<Mail className="w-5 h-5" />} label="Email" href={`mailto:${b.email}`} />}
+        <Act icon={<Pencil className="w-5 h-5" />} label="Edit" onClick={onEdit} />
+        <Act icon={<KeyRound className="w-5 h-5" />} label="Reset login" onClick={onReset} />
+        {b.status === 'active' ? <Act icon={<Pause className="w-5 h-5" />} label="Suspend" onClick={() => onStatus('suspended')} /> : <Act icon={<Play className="w-5 h-5" />} label={b.status === 'suspended' ? 'Reactivate' : 'Approve'} onClick={() => onStatus('active')} />}
+      </div>
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-700/30">{tabs.map(([id, l]) => <button key={id} onClick={() => onTab(id)} className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 ${tab === id ? 'border-field-600 text-field-600 font-medium' : 'border-transparent text-slate-500'}`}>{l}</button>)}</div>
+
+      {tab === 'overview' && <>
+        <div className="grid grid-cols-3 gap-2 text-center"><Card className="p-3"><div className="text-xl font-semibold">{b.bookings}</div><div className="text-xs text-slate-500">Bookings</div></Card><Card className="p-3"><div className="text-xl font-semibold">{stats?.upcoming ?? 0}</div><div className="text-xs text-slate-500">Upcoming</div></Card><Card className="p-3"><div className="text-xl font-semibold">{Math.round(stats?.revenue ?? 0).toLocaleString()}</div><div className="text-xs text-slate-500">Paid (KES)</div></Card></div>
+        <Card className="p-4"><Row k="Owner sign-in" v={b.email} /><Row k="Phone" v={b.phone} /><Row k="Town" v={b.city} /><Row k="Booking page" v={`/book/${b.slug}`} /><Row k="Plan" v={full?.plan} /><Row k="Paused by owner" v={full?.paused ? 'Yes' : 'No'} /><Row k="Website" v={full?.website} /><Row k="Created" v={new Date(b.created_at).toLocaleDateString('en-KE', { timeZone: 'Africa/Nairobi' })} /></Card>
+      </>}
+
+      {tab === 'bookings' && (data.bookings == null ? <Skeleton rows={3} /> : data.bookings.length === 0 ? <EmptyState message="No bookings yet." /> : data.bookings.map((r) => (
+        <Card key={r.id} className="p-3 flex items-center justify-between gap-3"><div className="min-w-0"><div className="text-sm font-medium">{r.customer_name} <span className="text-slate-400 font-normal">· {r.customer_phone}</span></div><div className="text-xs text-slate-500">{new Date(r.starts_at).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', dateStyle: 'medium', timeStyle: 'short' })} · {r.code}</div></div><div className="text-right text-xs shrink-0"><div className="capitalize">{String(r.status).replace('_', ' ')}</div><div className="text-slate-400">KES {Number(r.price).toLocaleString()}{r.paid ? ' · paid' : ''}</div></div></Card>)))}
+
+      {tab === 'services' && (data.services == null ? <Skeleton rows={3} /> : data.services.length === 0 ? <EmptyState message="No services yet." /> : data.services.map((r) => (
+        <Card key={r.id} className="p-3 flex items-center justify-between gap-3"><div className="min-w-0"><div className="text-sm font-medium">{r.name}</div><div className="text-xs text-slate-500">{r.duration_min ? `${r.duration_min} min` : ''}{r.active === false ? ' · hidden' : ''}</div></div><div className="text-sm shrink-0">KES {Number(r.price ?? 0).toLocaleString()}</div></Card>)))}
+
+      {tab === 'team' && (data.team == null ? <Skeleton rows={3} /> : data.team.length === 0 ? <EmptyState message="No team or chairs yet." /> : data.team.map((r) => (
+        <Card key={r.id} className="p-3 flex items-center justify-between gap-3"><div className="text-sm font-medium">{r.name}</div><div className="text-xs text-slate-500">{r.active === false ? 'inactive' : 'active'}</div></Card>)))}
+
+      {tab === 'reviews' && (data.reviews == null ? <Skeleton rows={3} /> : reviews.length === 0 ? <EmptyState message="No reviews yet." /> : [...reviews].sort((a, c) => Number(!!c.hide_requested && !c.hidden) - Number(!!a.hide_requested && !a.hidden)).map((r) => (
+        <Card key={r.id} className={`p-3 space-y-1 ${r.hide_requested && !r.hidden ? 'border-amber-500/50' : ''}`}>
+          <div className="flex items-center justify-between"><span className="inline-flex gap-0.5">{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`w-3.5 h-3.5 ${n <= r.rating ? 'fill-current text-amber-500' : 'text-slate-500'}`} />)}</span><span className="text-xs text-slate-400">{r.hidden ? 'hidden' : r.hide_requested ? 'owner asked to hide' : 'public'}</span></div>
+          {r.comment && <p className="text-sm">{r.comment}</p>}
+          {r.hide_requested && !r.hidden && <p className="text-xs text-amber-600">Owner's reason: {r.hide_reason || '—'}</p>}
+          <div className="flex gap-2 pt-1">
+            {!r.hidden && <button onClick={() => hideReview(r.id, true)} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><EyeOff className="w-3 h-3" />{r.hide_requested ? 'Approve & hide' : 'Hide'}</button>}
+            {r.hidden && <button onClick={() => hideReview(r.id, false)} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><Eye className="w-3 h-3" />Show again</button>}
+            {r.hide_requested && !r.hidden && <button onClick={() => { void supabase.from('bk_reviews').update({ hide_requested: false }).eq('id', r.id).then(() => loadTab('reviews')); }} className="btn-secondary text-xs !py-1">Decline</button>}
+          </div></Card>)))}
+
+      {tab === 'manage' && <Card className="p-4 space-y-3">
+        <p className="text-sm text-slate-500">Login, suspension and removal for this business.</p>
+        <div className="flex flex-wrap gap-2"><button onClick={onEdit} className="btn-secondary text-xs inline-flex items-center gap-1"><Pencil className="w-3 h-3" />Edit details</button><button onClick={onReset} className="btn-secondary text-xs inline-flex items-center gap-1"><KeyRound className="w-3 h-3" />Reset password</button></div>
+        <button onClick={onDelete} className="text-xs py-1.5 px-3 rounded-lg border border-rust-500/40 text-rust-500 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />Delete this business</button>
+      </Card>}
     </div>
   );
 }

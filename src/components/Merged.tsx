@@ -3,8 +3,8 @@ import { useState, type ReactNode } from 'react';
 export interface BookingPart { id: string; label: string; node: ReactNode }
 
 /** One menu for both products: a ShopOS | Booking switch at the top, and when Booking has several views, small tabs under it. */
-export function Merged({ id, shop, booking }: { id: string; shop: ReactNode; booking: BookingPart[] }) {
-  const [side, setSide] = useState<'shop' | 'booking'>(() => { try { return localStorage.getItem(`shopos-admin-side-${id}`) === 'booking' ? 'booking' : 'shop'; } catch { return 'shop'; } });
+export function Merged({ id, shop, booking, preferBooking }: { id: string; shop: ReactNode; booking: BookingPart[]; preferBooking?: boolean }) {
+  const [side, setSide] = useState<'shop' | 'booking'>(() => { if (preferBooking) return 'booking'; try { return localStorage.getItem(`shopos-admin-side-${id}`) === 'booking' ? 'booking' : 'shop'; } catch { return 'shop'; } });
   const [part, setPart] = useState(booking[0].id);
   const pick = (v: 'shop' | 'booking') => { setSide(v); try { localStorage.setItem(`shopos-admin-side-${id}`, v); } catch { /* ignore */ } };
   const cur = booking.find((b) => b.id === part) ?? booking[0];

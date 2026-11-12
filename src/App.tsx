@@ -207,7 +207,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             )}
             {tab === 'branches' && <Branches supabase={supabase} onOpenBusiness={openBusiness} />}
             {tab === 'features' && <FeatureRequests supabase={supabase} />}
-            {tab === 'reviews' && <Reviews supabase={supabase} />}
+            {tab === 'reviews' && <Merged id="reviews" preferBooking={badges.bk_hide_requests > 0 && badges.reviews === 0} shop={<Reviews supabase={supabase} />} booking={[{ id: 'bkrev', label: 'Booking reviews', node: <BookingAdmin supabase={supabase} view="reviews" /> }]} />}
             {tab === 'audit' && <AuditLogs supabase={supabase} />}
             {tab === 'support' && <Support supabase={supabase} />}
             {tab === 'settings' && <PlatformSettingsPage supabase={supabase} />}
