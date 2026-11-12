@@ -4,6 +4,7 @@ import { Check, X, Sparkles, Trash2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { FeatureRequest } from '../lib/types';
 import { describeError } from '../lib/errors';
+import { askConfirm } from '../lib/dialog';
 
 export default function FeatureRequests({ supabase }: { supabase: SupabaseClient }) {
   const [requests, setRequests] = useState<FeatureRequest[]>([]);
@@ -41,7 +42,7 @@ export default function FeatureRequests({ supabase }: { supabase: SupabaseClient
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this request permanently? This cannot be undone.')) return;
+    if (!await askConfirm('Delete this request permanently? This cannot be undone.')) return;
     setBusy(id); setError(null);
     try {
       const { error: deleteError } = await supabase.from('feature_requests').delete().eq('id', id);

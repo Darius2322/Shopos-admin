@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Save, KeyRound } from 'lucide-react';
 import { Card, ErrorText, Skeleton } from '../components/ui';
 import { LegalEditor } from '../components/LegalEditor';
+import { askConfirm } from '../lib/dialog';
 
 interface PlatformSettings {
   id: string;
@@ -305,7 +306,7 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
             {app.closed || app.parts.length > 0
               ? <button onClick={() => void saveApp(false, [])} disabled={busy} className="btn-primary text-sm">Open everything again</button>
               : null}
-            {!app.closed && <button onClick={() => { if (window.confirm('Close the WHOLE app for every business now?')) void saveApp(true); }} disabled={busy} className="text-sm px-3 py-2 rounded-lg bg-rust-500 text-white">Close the whole app</button>}
+            {!app.closed && <button onClick={async () => { if (await askConfirm('Close the WHOLE app for every business now?')) void saveApp(true); }} disabled={busy} className="text-sm px-3 py-2 rounded-lg bg-rust-500 text-white">Close the whole app</button>}
           </div>
         </Card>
       )}

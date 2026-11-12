@@ -6,6 +6,7 @@ import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components
 import { OtpDeliveryActions } from '../components/OtpDeliveryActions';
 import { OwnerRequest } from '../lib/types';
 import { supabaseUrl } from '../lib/supabase';
+import { askConfirm } from '../lib/dialog';
 
 export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }) {
   const [requests, setRequests] = useState<OwnerRequest[]>([]);
@@ -31,7 +32,7 @@ export default function OwnerRequests({ supabase }: { supabase: SupabaseClient }
   useEffect(() => { load(); }, []);
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this request permanently? This cannot be undone.')) return;
+    if (!await askConfirm('Delete this request permanently? This cannot be undone.')) return;
     setBusy(id); setError(null);
     try {
       const { error: deleteError } = await supabase.from('owner_requests').delete().eq('id', id);

@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Card } from './ui';
 import { Copy, Download, Loader2, Search, X } from 'lucide-react';
 import { DAYS_LONG, EVENT_LABEL, ago, call, country, dur, download, fmt, n, when, where } from '../lib/siteUtil';
+import { askConfirm } from '../lib/dialog';
 
 export type VisitorView = 'overview' | 'live' | 'places' | 'sources' | 'pages' | 'devices' | 'people' | 'network' | 'bots' | 'security';
 export const VISITOR_VIEWS: [VisitorView, string][] = [
@@ -317,7 +318,7 @@ function SecurityView({ supabase, days, onIp }: { supabase: SupabaseClient; days
   useEffect(() => { setD(null); void load(); }, [load]);
   async function erase(older: number) {
     const what = older === 0 ? 'ALL stored IP addresses and browser identities' : `stored IP addresses older than ${older} days`;
-    if (!window.confirm(`Erase ${what}? Counts and charts stay; only the IP details are removed. This cannot be undone.`)) return;
+    if (!await askConfirm(`Erase ${what}? Counts and charts stay; only the IP details are removed. This cannot be undone.`)) return;
     setBusy(true); setMsg(null);
     const r = await call<number>(supabase, 'admin_site_clear_ips', { p_older_than_days: older });
     setBusy(false); setMsg(r.error ?? `Erased the IP details of ${fmt(r.data)} records.`); void load();

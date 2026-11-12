@@ -5,6 +5,7 @@ import { PackageStats } from '../components/PackageStats';
 import { Card, EmptyState, Skeleton, ErrorText } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
 import { useBadges, refreshBadges, BadgeDot } from '../lib/badges';
+import { askConfirm } from '../lib/dialog';
 
 interface Service { key: string; label: string; description: string | null }
 interface Pkg { id: string; name: string; tagline: string | null; description: string | null; price: number; yearly_price?: number | null; currency: string; validity_months: number | null; validity_days: number | null; features: string[]; service_keys: string[]; highlighted: boolean; is_public: boolean; is_active: boolean; sort: number }
@@ -288,7 +289,7 @@ function BusinessesTab({ supabase, pkgs, focusId, onCloseFocus }: { supabase: Su
   }
   async function removePlan(endNow: boolean) {
     if (!sel) return;
-    if (!window.confirm(endNow ? `End ${sel.name}'s plan now? The business will be switched off until you apply a package again.` : `Remove ${sel.name}'s package? It goes back to having no package, with full access, and keeps its end date.`)) return;
+    if (!await askConfirm(endNow ? `End ${sel.name}'s plan now? The business will be switched off until you apply a package again.` : `Remove ${sel.name}'s package? It goes back to having no package, with full access, and keeps its end date.`)) return;
     setBusy(true); setMsg(null);
     const { error } = await supabase.rpc('admin_remove_business_package', { p_business_id: sel.business_id, p_end_now: endNow, p_note: note || null });
     if (error) setMsg({ ok: false, text: friendlyError(error, 'Could not change this plan.') }); else { setMsg({ ok: true, text: endNow ? 'Plan ended.' : 'Package removed.' }); await load(); await pick({ ...sel, package_id: endNow ? sel.package_id : null, package_name: endNow ? sel.package_name : null }); }
@@ -393,7 +394,7 @@ function OffersTab({ supabase, services }: { supabase: SupabaseClient; services:
     setBusy(false);
   }
   async function end(o: Offer) {
-    if (!window.confirm(`End "${o.name}" now? Businesses lose the access it gave.`)) return;
+    if (!await askConfirm(`End "${o.name}" now? Businesses lose the access it gave.`)) return;
     setBusy(true); setMsg(null);
     const { error } = await supabase.rpc('admin_end_offer', { p_id: o.id });
     if (error) setMsg({ ok: false, text: friendlyError(error, 'Could not end the offer.') }); else { setMsg({ ok: true, text: 'Offer ended.' }); await load(); setView(null); }

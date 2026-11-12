@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Card, ErrorText } from './ui';
 import { LEGAL_DEFAULTS } from '../lib/legalDefaults';
+import { askConfirm } from '../lib/dialog';
 
 const PAGES: [string, string, string][] = [
   ['terms', 'Terms & Conditions', '/legal#terms'],
@@ -79,7 +80,7 @@ export function LegalEditor({ supabase }: { supabase: SupabaseClient }) {
         <div className="flex flex-wrap gap-2">
           <button onClick={() => void save()} disabled={busy || !body.trim() || (live !== 'none' && !changed && live === 'custom')} className="btn-primary text-sm">{busy ? 'Saving…' : live === 'standard' && !changed ? 'Save as my own text' : 'Save'}</button>
           {changed && <button onClick={() => setBody(orig)} className="btn-secondary text-sm">Undo my edits</button>}
-          {live === 'custom' && <button onClick={() => { if (window.confirm('Go back to the built-in text? Your version stays in the history.')) void save(true); }} disabled={busy} className="btn-secondary text-sm">Use the built-in text</button>}
+          {live === 'custom' && <button onClick={async () => { if (await askConfirm('Go back to the built-in text? Your version stays in the history.')) void save(true); }} disabled={busy} className="btn-secondary text-sm">Use the built-in text</button>}
           <a href={`${SITE}${PAGES.find((p) => p[0] === key)![2]}`} target="_blank" rel="noreferrer" className="btn-secondary text-sm inline-flex items-center">View page</a>
         </div>
       </Card>

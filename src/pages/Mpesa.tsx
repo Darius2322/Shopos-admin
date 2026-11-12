@@ -4,6 +4,7 @@ import { Loader2, X } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
 import * as pay from '../lib/payAdmin';
+import { askConfirm, askPrompt } from '../lib/dialog';
 
 interface Row {
   source_id: string; business_id: string; business_name: string; label: string; kind: string; number: string; mode: string; status: string;
@@ -50,9 +51,9 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
 
   async function act(r: Row, what: 'reject' | 'reset' | 'c2b' | 'off' | 'approve' | 'disable' | 'enable') {
     setErr(null); setMsg(null);
-    if (what === 'off' && !window.confirm(`Disconnect ${r.business_name} from Safaricom? Their keys are deleted.`)) return;
+    if (what === 'off' && !await askConfirm(`Disconnect ${r.business_name} from Safaricom? Their keys are deleted.`)) return;
     let note: string | null = null;
-    if (what === 'reject') { note = window.prompt('Short reason to show the owner (optional):') ?? ''; }
+    if (what === 'reject') { note = (await askPrompt('Short reason to show the owner (optional):')) ?? ''; }
     setBusy(r.source_id);
     if (what === 'reject' || what === 'reset' || what === 'disable' || what === 'enable') {
       const { error } = await supabase.rpc('admin_mpesa_decide', { p_source_id: r.source_id, p_decision: what, p_note: note });

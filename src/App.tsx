@@ -12,7 +12,7 @@ import BookingAdmin, { type BkView } from './pages/BookingAdmin';
 import BookingInsights from './pages/BookingInsights';
 import DatabasePage from './pages/Database';
 import SoftDelete from './pages/SoftDelete';
-import { useBadges } from './lib/badges';
+import { useBadges, markTabSeen } from './lib/badges';
 import Sidebar, { Tab } from './components/Sidebar';
 import { GlobalSearch } from './components/GlobalSearch';
 import { NotificationsMenu } from './components/NotificationsMenu';
@@ -133,6 +133,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const badges = useBadges(supabase);
+  useEffect(() => { markTabSeen(tab); }, [tab, badges]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 

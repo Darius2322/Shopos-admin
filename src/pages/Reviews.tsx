@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Check, X, Trash2, Star } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton } from '../components/ui';
 import { describeError } from '../lib/errors';
+import { askConfirm } from '../lib/dialog';
 
 interface ReviewRow {
   id: string; author_name: string; business_name: string | null; rating: number; body: string;
@@ -37,7 +38,7 @@ export default function Reviews({ supabase }: { supabase: SupabaseClient }) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this review permanently?')) return;
+    if (!await askConfirm('Delete this review permanently?')) return;
     setBusy(id); setError(null);
     try {
       const { error: err } = await supabase.from('reviews').delete().eq('id', id);

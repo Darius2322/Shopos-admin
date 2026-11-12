@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Plus, X, Pencil, Trash2, Eye, EyeOff, GitBranch, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
+import { askConfirm } from '../lib/dialog';
 
 interface Release {
   id: string;
@@ -53,7 +54,7 @@ export default function AppReleases({ supabase }: { supabase: SupabaseClient }) 
   }
 
   async function remove(r: Release) {
-    if (!confirm(`Delete release ${r.version} (${TARGET_LABEL[r.target_app]})? This can't be undone.`)) return;
+    if (!await askConfirm(`Delete release ${r.version} (${TARGET_LABEL[r.target_app]})? This can't be undone.`)) return;
     setError(null);
     const { error } = await supabase.from('app_releases').delete().eq('id', r.id);
     if (error) setError(friendlyError(error)); else load();

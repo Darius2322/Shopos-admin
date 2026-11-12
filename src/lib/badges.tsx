@@ -48,6 +48,7 @@ export async function refreshBadges() {
   if (seeded && total(next) > total(current) && soundOn()) chime();
   seeded = true;
   current = next;
+  for (const t of ['requests', 'packages', 'features', 'reviews', 'support', 'installers', 'apps']) if (seen[t] != null && seen[t] > rawFor(next, t)) seen[t] = rawFor(next, t);
   listeners.forEach((l) => l(current));
 }
 
@@ -72,7 +73,16 @@ export function useBadges(supabase: SupabaseClient): Badges {
   return b;
 }
 
-export const badgeFor = (b: Badges, tab: string): number =>
+// A menu's number drops as soon as it is opened and returns only for requests that arrive afterwards.
+const SEEN_KEY = 'shopos-admin-seen';
+let seen: Record<string, number> = (() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) ?? '{}'); } catch { return {}; } })();
+export function markTabSeen(tab: string) {
+  const n = rawFor(current, tab); if (seen[tab] === n) return;
+  seen = { ...seen, [tab]: n }; try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch { /* ignore */ }
+  listeners.forEach((l) => l({ ...current }));
+}
+export const badgeFor = (b: Badges, tab: string): number => Math.max(0, rawFor(b, tab) - Math.min(seen[tab] ?? 0, rawFor(b, tab)));
+const rawFor = (b: Badges, tab: string): number =>
   tab === 'requests' ? b.requests : tab === 'packages' ? b.package_requests : tab === 'features' ? b.features
   : tab === 'reviews' ? b.reviews + b.bk_hide_requests : tab === 'support' ? b.support : (tab === 'installers' || tab === 'apps') ? b.installers : 0;
 
