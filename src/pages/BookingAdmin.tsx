@@ -136,12 +136,13 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
     const shown = reviews.filter((r) => !r.hidden); const avg = shown.length ? shown.reduce((a, r) => a + r.rating, 0) / shown.length : 0;
     return (
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2"><Kpi l="Reviews" v={reviews.length} /><Kpi l="Average" v={avg ? avg.toFixed(1) : '–'} /></div>
-        {reviews.length === 0 ? <EmptyState message="No reviews yet." /> : reviews.map((r) => (
+        <div className="grid grid-cols-3 gap-2"><Kpi l="Reviews" v={reviews.length} /><Kpi l="Average" v={avg ? avg.toFixed(1) : '–'} /><Kpi l="Hide requests" v={reviews.filter((r) => r.hide_requested && !r.hidden).length} /></div>
+        {reviews.length === 0 ? <EmptyState message="No reviews yet." /> : [...reviews].sort((a, b) => Number(!!b.hide_requested && !b.hidden) - Number(!!a.hide_requested && !a.hidden)).map((r) => (
           <Card key={r.id} className={`p-3 ${r.hidden ? 'opacity-60' : ''}`}>
             <div className="flex items-center justify-between gap-2"><div className="text-sm"><span className="inline-flex">{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`w-3.5 h-3.5 ${i <= r.rating ? 'fill-current' : 'opacity-30'}`} />)}</span> <span className="text-xs text-slate-500 ml-1">{r.bk_businesses?.name} · {r.customer_name} · {ago(r.created_at)}</span></div>
               <button className="btn-secondary text-xs !py-1 inline-flex items-center gap-1" onClick={async () => { await supabase.from('bk_reviews').update({ hidden: !r.hidden }).eq('id', r.id); setTick((x) => x + 1); }}>{r.hidden ? <><Eye className="w-3 h-3" />Show</> : <><EyeOff className="w-3 h-3" />Hide</>}</button></div>
             {r.comment && <p className="text-sm text-slate-500 mt-1">{r.comment}</p>}
+            {r.hide_requested && !r.hidden && <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"><b>The business asked to hide this review.</b> Reason: {r.hide_reason || 'none given'}<div className="mt-1.5 flex gap-2"><button className="btn-primary text-xs !py-1" onClick={async () => { await supabase.from('bk_reviews').update({ hidden: true }).eq('id', r.id); setTick((x) => x + 1); }}>Approve: hide it</button><button className="btn-secondary text-xs !py-1" onClick={async () => { await supabase.from('bk_reviews').update({ hide_requested: false }).eq('id', r.id); setTick((x) => x + 1); }}>Decline: keep it</button></div></div>}
           </Card>))}
       </div>
     );
