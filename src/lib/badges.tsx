@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export interface Badges { requests: number; package_requests: number; packages_expiring: number; features: number; reviews: number; support: number; installers: number }
-const EMPTY: Badges = { requests: 0, package_requests: 0, packages_expiring: 0, features: 0, reviews: 0, support: 0, installers: 0 };
+export interface Badges { requests: number; package_requests: number; packages_expiring: number; features: number; reviews: number; support: number; installers: number; bk_hide_requests: number }
+const EMPTY: Badges = { requests: 0, package_requests: 0, packages_expiring: 0, features: 0, reviews: 0, support: 0, installers: 0, bk_hide_requests: 0 };
 
 let current: Badges = EMPTY;
 const listeners = new Set<(b: Badges) => void>();
@@ -37,7 +37,7 @@ export function chime() {
     o.connect(g).connect(comp); o.start(t); o.stop(t + 0.55);
   });
 }
-const total = (b: Badges) => b.requests + b.package_requests + b.features + b.reviews + b.support + b.installers;
+const total = (b: Badges) => b.requests + b.package_requests + b.features + b.reviews + b.support + b.installers + b.bk_hide_requests;
 let seeded = false;
 
 export async function refreshBadges() {
@@ -74,7 +74,7 @@ export function useBadges(supabase: SupabaseClient): Badges {
 
 export const badgeFor = (b: Badges, tab: string): number =>
   tab === 'requests' ? b.requests : tab === 'packages' ? b.package_requests : tab === 'features' ? b.features
-  : tab === 'reviews' ? b.reviews : tab === 'support' ? b.support : (tab === 'installers' || tab === 'apps') ? b.installers : 0;
+  : tab === 'reviews' ? b.reviews + b.bk_hide_requests : tab === 'support' ? b.support : (tab === 'installers' || tab === 'apps') ? b.installers : 0;
 
 /** Menu groups: the number on a group is the sum of what is new inside it. */
 export const groupCount = (b: Badges, tabs: string[]): number => tabs.reduce((n, t) => n + badgeFor(b, t), 0);
