@@ -35,6 +35,7 @@ import Monitor from './pages/Monitor';
 import Mpesa from './pages/Mpesa';
 import Assistant from './pages/Assistant';
 import { friendlyError } from './lib/friendlyError';
+import { registerPush } from './lib/push';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -49,6 +50,9 @@ export default function App() {
       setLoading(false);
     });
   }, []);
+
+  // On the phone app: ring this phone the moment a new request, ticket or review-hide request arrives.
+  useEffect(() => { if (session && isAdmin) void registerPush('admin'); }, [session, isAdmin]);
 
   async function checkAdmin(userId: string) {
     if (!supabase) return;
@@ -197,7 +201,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'businesses' && (
               openBusinessId
                 ? <BusinessDetail supabase={supabase} businessId={openBusinessId} onBack={() => setOpenBusinessId(null)} />
-                : <Merged id="businesses" shop={<Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />} booking={[{ id: 'biz', label: 'Businesses', node: <Bookings supabase={supabase} view="biz" /> }, { id: 'own', label: 'Owners & logins', node: <BookingAdmin supabase={supabase} view="owners" /> }, { id: 'cat', label: 'Services & chairs', node: <BookingAdmin supabase={supabase} view="catalog" /> }, { id: 'plans', label: 'Plans & fees', node: <BookingAdmin supabase={supabase} view="plans" /> }]} />
+                : <Merged id="businesses" shop={<Businesses supabase={supabase} onOpen={setOpenBusinessId} onNew={() => setTab('create')} />} booking={[{ id: 'biz', label: 'Businesses', node: <Bookings supabase={supabase} view="biz" /> }, { id: 'own', label: 'Owners & logins', node: <BookingAdmin supabase={supabase} view="owners" /> }, { id: 'cat', label: 'Services & chairs', node: <BookingAdmin supabase={supabase} view="catalog" /> }]} />
             )}
             {tab === 'create' && (
               <div className="space-y-3">
@@ -217,7 +221,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'monitor' && <Monitor supabase={supabase} />}
             {tab === 'mpesa' && <Mpesa supabase={supabase} />}
             {tab === 'assistant' && <Assistant />}
-            {tab === 'packages' && <Packages supabase={supabase} />}
+            {tab === 'packages' && <Merged id="packages" shop={<Packages supabase={supabase} />} booking={[{ id: 'plans', label: 'Booking plans & fees', node: <BookingAdmin supabase={supabase} view="plans" /> }]} />}
             {tab === 'businesstypes' && <BusinessTypes supabase={supabase} />}
             {tab === 'bookings' && <Merged id="bookings" shop={<p className="text-sm text-slate-400">Bookings belong to the Booking side.</p>} booking={[{ id: 'all', label: 'All bookings', node: <Bookings supabase={supabase} view="bookings" /> }, { id: 'today', label: 'Today & tomorrow', node: <BookingAdmin supabase={supabase} view="today" /> }, { id: 'cust', label: 'Customers', node: <BookingInsights supabase={supabase} view="customers" /> }, { id: 'q', label: 'Quotes', node: <BookingAdmin supabase={supabase} view="quotes" /> }, { id: 'rv', label: 'Reviews', node: <BookingAdmin supabase={supabase} view="reviews" /> }, { id: 'bc', label: 'Broadcast', node: <BookingAdmin supabase={supabase} view="broadcast" /> }, { id: 'bl', label: 'Blocked numbers', node: <BookingAdmin supabase={supabase} view="blocked" /> }]} />}
             {tab === 'database' && <DatabasePage supabase={supabase} />}
