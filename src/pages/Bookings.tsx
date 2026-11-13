@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Check, X, Copy, KeyRound, Plus, ExternalLink, Pause, Play, Trash2, Pencil, Download, ChevronRight, ArrowLeft, Phone, Mail, MessageCircle, Star, Eye, EyeOff } from 'lucide-react';
 import { Card, ErrorText, Skeleton, EmptyState } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
+import { useBackClose } from '../lib/backStack';
 
 const KINDS: [string, string][] = [['salon', 'Salon'], ['barbershop', 'Barbershop'], ['beauty', 'Beauty studio'], ['spa', 'Spa & massage'], ['bus', 'Bus & shuttle'], ['clinic', 'Clinic'], ['carwash', 'Car wash'], ['fitness', 'Fitness & classes'], ['custom', 'Custom']];
 const DEFAULT_PASSWORD = 'Shopos 001';
@@ -28,7 +29,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
   const [del, setDel] = useState<{ id: string; name: string; typed: string } | null>(null);
   const [edit, setEdit] = useState<{ id: string; name: string; phone: string; city: string; email: string } | null>(null);
   const [stats, setStats] = useState<Record<string, { revenue: number; upcoming: number }>>({});
-  const [openBiz, setOpenBiz] = useState<Biz | null>(null); const [bTab, setBTab] = useState('overview');
+  const [openBiz, setOpenBiz] = useState<Biz | null>(null); useBackClose(!!openBiz, () => setOpenBiz(null)); const [bTab, setBTab] = useState('overview');
   const [reset, setReset] = useState<{ id: string; name: string; pw: string } | null>(null);
 
   const load = useCallback(async () => {

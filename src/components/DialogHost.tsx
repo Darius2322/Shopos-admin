@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { onDialog, type DialogRequest } from '../lib/dialog';
+import { useBackClose } from '../lib/backStack';
 
 /** Shows the app's own dialog instead of the browser's alert / confirm / prompt. Mount once, near the root. */
 export function DialogHost() {
@@ -7,8 +8,10 @@ export function DialogHost() {
   const [text, setText] = useState('');
   useEffect(() => { onDialog((d) => setQueue((q) => [...q, d])); return () => onDialog(null); }, []);
   const cur = queue[0];
-  if (!cur) return null;
   const close = (fn: () => void) => { fn(); setText(''); setQueue((q) => q.slice(1)); };
+  // Phone back = Cancel (or OK on a plain message).
+  useBackClose(!!cur, () => { if (cur) close(() => (cur.kind === 'confirm' ? cur.resolve(false) : cur.kind === 'prompt' ? cur.resolve(null) : cur.resolve())); });
+  if (!cur) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-sm rounded-2xl bg-paper-raised border border-slate-200 p-5 shadow-xl">

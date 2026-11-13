@@ -36,6 +36,8 @@ import Mpesa from './pages/Mpesa';
 import Assistant from './pages/Assistant';
 import { friendlyError } from './lib/friendlyError';
 import { registerPush } from './lib/push';
+import { DownloadApp } from './components/DownloadApp';
+import { useTabHistory } from './lib/backStack';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -116,6 +118,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
           {error && <p className="text-xs text-rust-500">{error}</p>}
           <button className="btn-primary w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>
+        <div className="mt-4 max-w-xs mx-auto w-full"><DownloadApp app="admin" /></div>
         <p className="text-xs text-slate-500 mt-5 text-center max-w-xs mx-auto">
           This portal is for the ShopOS platform administrator only. There is no self-service access here —
           admin accounts are created directly in the database.
@@ -132,7 +135,7 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('dashboard'); useTabHistory(tab, setTab, 'dashboard');
   const [openBusinessId, setOpenBusinessId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();

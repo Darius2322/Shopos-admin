@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
+import { DownloadApp } from './DownloadApp';
+import { useBackClose } from '../lib/backStack';
 
 export type Tab = 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant';
 
@@ -116,6 +118,7 @@ function Brand() {
 }
 
 export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseMobile, badges }: SidebarProps) {
+  useBackClose(mobileOpen, onCloseMobile);
   function select(t: Tab) {
     onSelect(t);
     onCloseMobile();
@@ -129,6 +132,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
         <Brand />
         <NavList tab={tab} onSelect={select} badges={badges} />
         <div className="p-3 border-t border-slate-700 shrink-0">
+          <DownloadApp app="admin" className="mb-2 !min-h-[40px] text-sm" />
           <button onClick={onSignOut} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-ink">
             <LogOut className="w-4 h-4" /> Sign out
           </button>
@@ -153,6 +157,7 @@ export default function Sidebar({ tab, onSelect, onSignOut, mobileOpen, onCloseM
             </div>
             <NavList tab={tab} onSelect={select} badges={badges} />
             <div className="p-3 border-t border-slate-700 shrink-0">
+              <DownloadApp app="admin" className="mb-2 !min-h-[40px] text-sm" />
               <button onClick={onSignOut} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-ink">
                 <LogOut className="w-4 h-4" /> Sign out
               </button>
