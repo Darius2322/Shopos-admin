@@ -7,9 +7,10 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 import { OfflineBar } from './components/OfflineBar';
 
 import { startNativeBack } from './lib/nativeBack';
-import { installOverlayAutoBack } from './lib/backStack';
+import { installOverlayAutoBack, installRootGuard } from './lib/backStack';
 startNativeBack();
 installOverlayAutoBack();
+installRootGuard(/ShopOS(App|Admin|Booker)\//.test(navigator.userAgent) || window.matchMedia?.('(display-mode: standalone)').matches);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><App /><DialogHost /><UpdatePrompt /><OfflineBar /></React.StrictMode>

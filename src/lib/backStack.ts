@@ -105,3 +105,35 @@ export function installOverlayAutoBack() {
     });
   }).observe(document.body, { childList: true, subtree: true });
 }
+
+/** First-screen guard for the installed apps. A hidden step is kept under the first screen, so the phone's back button always reaches our own
+ * code before the app can close. From there: go back to the page the person came from, or, on the home screen, ask to press back
+ * once more to leave. This works the same in the Android app and in an installed web app, with or without the newest app file. */
+type Nav = (to: string) => void;
+let navFn: Nav | null = null; let trail: string[] = []; let armedAt = 0;
+export function setGuardNavigator(fn: Nav) { navFn = fn; }
+export function trackRoute(path: string, kind: 'PUSH' | 'REPLACE' | 'POP') {
+  if (kind === 'REPLACE') { if (trail.length) trail[trail.length - 1] = path; else trail.push(path); }
+  else if (kind === 'POP') { if (trail.length > 1 && trail[trail.length - 2] === path) trail.pop(); else if (trail[trail.length - 1] !== path) trail.push(path); }
+  else if (trail[trail.length - 1] !== path) trail.push(path);
+  if (trail.length > 60) trail = trail.slice(-60);
+}
+function toastExit() {
+  const el = document.createElement('div'); el.textContent = 'Press back again to exit';
+  el.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:2147483000;background:rgba(20,20,20,.92);color:#fff;font:500 13px system-ui,sans-serif;padding:9px 16px;border-radius:999px';
+  document.body.appendChild(el); window.setTimeout(() => el.remove(), 1800);
+}
+let guardOn = false;
+export function installRootGuard(isApp: boolean) {
+  if (guardOn || typeof window === 'undefined' || !isApp) return; guardOn = true;
+  if (!st()?.soRoot) { window.history.replaceState({ ...(st() ?? {}), soRoot: true }, ''); window.history.pushState({ ...(st() ?? {}), soRoot: false }, ''); }
+  window.addEventListener('popstate', () => {
+    if (ignore > 0 || !st()?.soRoot) return;
+    if (overlays.length || tabHandlers.length && typeof st()?.soTab === 'string') return;
+    // Landed on the hidden first step: decide what back means here.
+    if (trail.length > 1 && navFn) { trail.pop(); const prev = trail[trail.length - 1]; navFn(prev); return; }
+    if (Date.now() - armedAt < 1800) { armedAt = 0; window.history.back(); return; } // second press: leave
+    armedAt = Date.now(); toastExit();
+    window.history.pushState({ ...(st() ?? {}), soRoot: false }, '');
+  });
+}

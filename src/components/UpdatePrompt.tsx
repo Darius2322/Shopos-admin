@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Download } from 'lucide-react';
 import { useBackClose } from '../lib/backStack';
+import { notifyNewApk, openApk } from '../lib/updateNotice';
 
 const SNOOZE = 'shopos-admin:update-snooze';
 const LATER_MS = 3 * 60 * 60 * 1000;
@@ -17,7 +18,7 @@ export function UpdatePrompt() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const had = !!navigator.serviceWorker.controller;
-    const on = () => { if (had) setWebNew(true); };
+    const on = () => { if (had) { setWebNew(true); (window as unknown as { __updateFound?: boolean }).__updateFound = true; } };
     navigator.serviceWorker.addEventListener('controllerchange', on);
     const poll = window.setInterval(() => { void navigator.serviceWorker.getRegistration().then((r) => r?.update()).catch(() => undefined); }, 30 * 60_000);
     return () => { navigator.serviceWorker.removeEventListener('controllerchange', on); window.clearInterval(poll); };
@@ -25,9 +26,12 @@ export function UpdatePrompt() {
   useEffect(() => {
     if (!mine) return; let live = true;
     const check = () => { void fetch('https://www.shopos.co.ke/downloads/android/latest-admin.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (live && j?.version && cmp(String(j.version), mine) > 0) setApk(String(j.version)); }).catch(() => undefined); };
-    check(); const t = window.setInterval(check, 30 * 60_000);
-    return () => { live = false; window.clearInterval(t); };
+      .then((j) => { if (live && j?.version && cmp(String(j.version), mine) > 0) { setApk(String(j.version)); (window as unknown as { __updateFound?: boolean }).__updateFound = true; void notifyNewApk(String(j.version), 'ShopOS-Admin.apk', 'ShopOS Admin'); } }).catch(() => undefined); };
+    check(); const t = window.setInterval(check, 15 * 60_000);
+    const on = () => { try { localStorage.removeItem(SNOOZE); } catch { /* ignore */ } setNow(Date.now()); check(); };
+    window.addEventListener('shopos:check-update', on);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    return () => { live = false; window.clearInterval(t); window.removeEventListener('shopos:check-update', on); };
   }, [mine]);
   const show = (webNew || !!apk) && now >= snoozedUntil();
   const later = () => { try { localStorage.setItem(SNOOZE, String(Date.now() + LATER_MS)); } catch { /* ignore */ } setNow(Date.now()); };
@@ -40,7 +44,7 @@ export function UpdatePrompt() {
         <div className="mx-auto w-12 h-12 rounded-full bg-field-50 text-field-700 flex items-center justify-center">{apk ? <Download className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}</div>
         <h3 className="font-display font-semibold text-lg">{apk ? 'New app version ready' : 'Update available'}</h3>
         <p className="text-sm text-slate-500">{apk ? `Version ${apk} is ready. Tap Update now, then open the downloaded file and tap Install. It installs over this app: do not uninstall.` : 'A newer version is ready. It takes a few seconds.'}</p>
-        <button onClick={() => { if (apk) { window.location.href = 'https://www.shopos.co.ke/downloads/android/ShopOS-Admin.apk'; later(); } else window.location.reload(); }} className="btn-primary w-full min-h-[48px]">Update now</button>
+        <button onClick={() => { if (apk) { openApk('ShopOS-Admin.apk'); later(); } else window.location.reload(); }} className="btn-primary w-full min-h-[48px]">Update now</button>
         <button onClick={later} className="btn-secondary w-full">Remind me later</button>
       </div>
     </div>

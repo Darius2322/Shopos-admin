@@ -17,6 +17,12 @@ async function start(onToken: (t: string) => void) {
     await push.addListener('pushNotificationReceived', (n: { title?: string; body?: string }) => {
       void P('LocalNotifications')?.schedule?.({ notifications: [{ id: Math.floor(Math.random() * 2e9), title: n.title ?? 'ShopOS', body: n.body ?? '', channelId: 'shopos-alerts', smallIcon: 'ic_stat_shopos' }] });
     });
+    // Tapping a notification opens what it is about (a page inside the app, or the new app file).
+    await push.addListener('pushNotificationActionPerformed', (e: { notification?: { data?: { url?: string } } }) => {
+      const u = e?.notification?.data?.url; if (!u) return;
+      if (/\.apk(\?|$)/i.test(u)) { try { window.open(u.startsWith('http') ? u : 'https://www.shopos.co.ke' + u, '_blank', 'noopener'); } catch { /* ignore */ } }
+      else if (u.startsWith('/')) window.location.href = u;
+    });
     await push.register();
     return true;
   } catch { return false; }

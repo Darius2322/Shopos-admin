@@ -156,6 +156,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   async function refreshAll() {
     if (refreshing) return;
     setRefreshing(true);
+    window.dispatchEvent(new Event('shopos:check-update'));
     try {
       const reg = await navigator.serviceWorker?.getRegistration();
       if (reg) { await reg.update(); if (reg.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); return; } }

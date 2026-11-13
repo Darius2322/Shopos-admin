@@ -25,10 +25,10 @@ export default function GoLive({ supabase }: { supabase: SupabaseClient }) {
   const [repo, setRepo] = useState(() => { try { return (JSON.parse(localStorage.getItem(GH_KEY) ?? '{}') as Record<string, string>).shopos_app ?? 'Darius2322/shopos-app'; } catch { return 'Darius2322/shopos-app'; } });
   const [st, setSt] = useState<St | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null); const [done, setDone] = useState<string | null>(null);
 
-  const call = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
+  const call = useCallback(async (action: string, extra: Record<string, unknown> = {}): Promise<Record<string, any>> => {
     const { data, error } = await supabase.functions.invoke('github-release', { body: { repo, action, ...extra } });
-    if (error) return { error: 'failed' } as { error: string };
-    return data as Record<string, any>;
+    if (error) return { error: 'failed' };
+    return (data ?? {}) as Record<string, any>;
   }, [supabase, repo]);
 
   const load = useCallback(async () => {
@@ -55,6 +55,19 @@ export default function GoLive({ supabase }: { supabase: SupabaseClient }) {
     setBusy(true); const d = await call('build_apk'); setBusy(false);
     if (d.error) { setErr(ERR[d.error as string] ?? 'Could not start the build.'); return; }
     void showAlert('The Android build has started. The new apps appear on the download links in about 10 minutes.'); void load();
+  }
+
+  async function tellPhones() {
+    if (!(await askConfirm('Send a notification to every phone that has the Android apps, telling them a new version is ready to download?'))) return;
+    setBusy(true); const out: string[] = [];
+    for (const [app, meta, name] of [['owner', 'latest.json', 'Owner app'], ['admin', 'latest-admin.json', 'Admin app'], ['booker', 'latest-booker.json', 'Booker app']] as const) {
+      let version = '';
+      try { const r = await fetch(`${PROD_URL}/downloads/android/${meta}`, { cache: 'no-store' }); if (r.ok) version = String((await r.json()).version ?? ''); } catch { /* ignore */ }
+      if (!version) { out.push(`${name}: no new file found`); continue; }
+      const { data, error } = await supabase.rpc('push_announce_update', { p_app: app, p_version: version });
+      out.push(error ? `${name}: failed` : `${name} ${version}: sent to ${data ?? 0} phone${data === 1 ? '' : 's'}`);
+    }
+    setBusy(false); void showAlert(out.join('\n'));
   }
 
   const same = st && st.ahead === 0;
@@ -86,7 +99,7 @@ export default function GoLive({ supabase }: { supabase: SupabaseClient }) {
         <Card className="p-4 space-y-2">
           <div className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-field-500" /><h3 className="font-medium text-sm">Android apps</h3></div>
           <p className="text-xs text-slate-400">The apps open the live website, so most changes need no new install. Build new apps only when the app shell itself changed.{st.build ? ` Last build: ${st.build.status === 'completed' ? (st.build.conclusion === 'success' ? 'succeeded' : st.build.conclusion) : st.build.status}, ${when(st.build.at)}.` : ''}</p>
-          <button onClick={() => void buildApk()} disabled={busy} className="btn-secondary text-xs">Build Android apps now</button>
+          <div className="flex flex-wrap gap-2"><button onClick={() => void buildApk()} disabled={busy} className="btn-secondary text-xs">Build Android apps now</button><button onClick={() => void tellPhones()} disabled={busy} className="btn-secondary text-xs">Tell phones a new app is ready</button></div>
         </Card>
       </>}
     </div>
