@@ -24,18 +24,46 @@ function audio(): AudioContext | null {
   } catch { return null; }
 }
 if (typeof window !== 'undefined') window.addEventListener('pointerdown', () => { audio(); }, { once: true });
-export function chime() {
+export function chime(notes: [number, number][] = [[784, 0], [988, 0.18], [1319, 0.36]]) {
   const c = audio();
   if (!c || c.state !== 'running') return;
   // Full-volume square-ish tones through a compressor so it is clearly audible on a phone speaker, three rising notes.
   const comp = c.createDynamicsCompressor(); comp.connect(c.destination);
-  [[784, 0], [988, 0.18], [1319, 0.36]].forEach(([f, at]) => {
+  notes.forEach(([f, at]) => {
     const o = c.createOscillator(); const g = c.createGain();
     o.type = 'triangle'; o.frequency.value = f;
     const t = c.currentTime + at;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
     o.connect(g).connect(comp); o.start(t); o.stop(t + 0.55);
   });
+}
+
+// Each kind of news has its own sound, a buzz and a line of text, so the admin knows what arrived without looking.
+const KINDS: [keyof Badges, string, [number, number][], number[]][] = [
+  ['requests', 'New owner request', [[784, 0], [988, 0.18], [1319, 0.36]], [200, 100, 200]],
+  ['package_requests', 'New package request', [[659, 0], [880, 0.16], [1175, 0.32], [1568, 0.48]], [300, 100, 300]],
+  ['support', 'New support message', [[880, 0], [698, 0.2]], [150]],
+  ['reviews', 'New review', [[1047, 0]], [100]],
+  ['bk_hide_requests', 'A business asked to hide a review', [[523, 0], [659, 0.15], [523, 0.3]], [200, 100, 200]],
+  ['features', 'New feature request', [[440, 0], [554, 0.15]], [150]],
+  ['installers', 'New installer request', [[587, 0], [740, 0.15]], [150]],
+];
+function toast(text: string) {
+  try {
+    const el = document.createElement('div'); el.textContent = text; el.setAttribute('role', 'status');
+    el.style.cssText = 'position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:2147483000;max-width:88vw;background:#0f766e;color:#fff;font:600 13px system-ui,sans-serif;padding:10px 16px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.35)';
+    document.body.appendChild(el); window.setTimeout(() => el.remove(), 4000);
+  } catch { /* ignore */ }
+}
+function announce(next: Badges, prev: Badges) {
+  const grown = KINDS.filter(([k]) => next[k] > prev[k]);
+  if (!grown.length) return;
+  const [, label, notes, buzz] = grown[0];
+  const extra = grown.length > 1 ? ` (+${grown.length - 1} more)` : '';
+  toast(label + extra);
+  if (soundOn()) chime(notes);
+  try { navigator.vibrate?.(buzz); } catch { /* ignore */ }
+  try { if (document.hidden && 'Notification' in window && Notification.permission === 'granted') new Notification('ShopOS Admin', { body: label + extra, icon: '/logo-emblem.png' }); } catch { /* ignore */ }
 }
 const total = (b: Badges) => b.requests + b.package_requests + b.features + b.reviews + b.support + b.installers + b.bk_hide_requests;
 let seeded = false;
@@ -45,7 +73,7 @@ export async function refreshBadges() {
   const { data, error } = await client.rpc('admin_badge_counts');
   if (error || !data) return; // a failed refresh keeps the last numbers instead of flashing zeros
   const next = { ...EMPTY, ...(data as Partial<Badges>) };
-  if (seeded && total(next) > total(current) && soundOn()) chime();
+  if (seeded && total(next) > total(current)) announce(next, current);
   seeded = true;
   current = next;
   for (const t of ['requests', 'packages', 'features', 'reviews', 'support', 'installers', 'apps']) if (seen[t] != null && seen[t] > rawFor(next, t)) seen[t] = rawFor(next, t);

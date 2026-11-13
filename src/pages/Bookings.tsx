@@ -10,7 +10,7 @@ const DEFAULT_PASSWORD = 'Shopos 001';
 const SITE = 'https://www.shopos.co.ke';
 interface App { id: string; business_name: string; kind: string; contact_name: string; phone: string; email: string | null; city: string | null; message: string | null; status: string; created_at: string }
 interface AllRow { created_at?: string; notes?: string | null; verified_at?: string | null; bk_services?: { name: string } | null; bk_staff?: { name: string } | null; id: string; code: string; customer_name: string; customer_phone: string; starts_at: string; status: string; price: number; paid: boolean; seats: number; bk_businesses: { name: string } | null }
-interface Biz { id: string; slug: string; name: string; kind: string; status: string; city: string | null; phone: string | null; email: string | null; created_at: string; bookings: number }
+interface Biz { id: string; slug: string; name: string; kind: string; status: string; city: string | null; phone: string | null; email: string | null; created_at: string; bookings: number; is_test?: boolean }
 
 /** Bookings: review applications, create a business with its owner's sign-in, pause or reset. Each owner runs the rest from /book-manage. */
 export default function Bookings({ supabase, view }: { supabase: SupabaseClient; view: 'apps' | 'biz' | 'bookings' }) {
@@ -35,7 +35,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
   const load = useCallback(async () => {
     const [a, b, c] = await Promise.all([
       supabase.from('bk_applications').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('bk_businesses').select('id, slug, name, kind, status, city, phone, email, created_at').order('created_at', { ascending: false }),
+      supabase.from('bk_businesses').select('id, slug, name, kind, status, city, phone, email, created_at, is_test').order('created_at', { ascending: false }),
       supabase.from('bk_bookings').select('business_id, price, paid, status, starts_at').limit(20000),
     ]);
     if (a.error || b.error) { setErr(friendlyError(a.error ?? b.error, 'Could not load bookings. Has the phase34 SQL been applied?')); return; }
@@ -157,7 +157,7 @@ export default function Bookings({ supabase, view }: { supabase: SupabaseClient;
           {biz.length === 0 ? <EmptyState message="No booking businesses yet." /> : biz.filter((b) => (filter === 'all' || b.status === filter) && (!q || `${b.name} ${b.email ?? ''} ${b.city ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((b) => (
             <Card key={b.id} className="p-0"><div role="button" tabIndex={0} onClick={() => { setOpenBiz(b); setBTab('overview'); }} onKeyDown={(e) => { if (e.key === 'Enter') { setOpenBiz(b); setBTab('overview'); } }} className="p-4 cursor-pointer hover:bg-slate-800/20 rounded-xl">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><div className="font-medium">{b.name} <span className="text-xs text-slate-400">· {KINDS.find((k) => k[0] === b.kind)?.[1] ?? b.kind}</span></div>
+                <div className="min-w-0"><div className="font-medium">{b.name}{b.is_test && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">Test</span>} <span className="text-xs text-slate-400">· {KINDS.find((k) => k[0] === b.kind)?.[1] ?? b.kind}</span></div>
                   <div className="text-sm text-slate-500">{b.email ?? ''}{b.city ? ` · ${b.city}` : ''}{b.phone ? ` · ${b.phone}` : ''}</div>
                   <a href={`${SITE}/book/${b.slug}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs text-field-700 inline-flex items-center gap-1 mt-1">/book/{b.slug}<ExternalLink className="w-3 h-3" /></a></div>
                 <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${b.status === 'active' ? 'bg-field-50 text-field-700' : b.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rust-500/10 text-rust-500'}`}>{b.status}</span>
@@ -321,6 +321,7 @@ function BizDetail({ b, supabase, stats, tab, onTab, onBack, onStatus, onEdit, o
       {tab === 'manage' && <Card className="p-4 space-y-3">
         <p className="text-sm text-slate-500">Login, suspension and removal for this business.</p>
         <div className="flex flex-wrap gap-2"><button onClick={onEdit} className="btn-secondary text-xs inline-flex items-center gap-1"><Pencil className="w-3 h-3" />Edit details</button><button onClick={onReset} className="btn-secondary text-xs inline-flex items-center gap-1"><KeyRound className="w-3 h-3" />Reset password</button></div>
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={!!full?.is_test} onChange={async (e) => { const v = e.target.checked; await supabase.from('bk_businesses').update({ is_test: v }).eq('id', b.id); setFull((o) => (o ? { ...o, is_test: v } : o)); }} /><span><b>Test business</b><span className="block text-xs text-slate-500">Hidden from the public list of businesses in the booker app. Its own link still works, so you can keep testing.</span></span></label>
         <button onClick={onDelete} className="text-xs py-1.5 px-3 rounded-lg border border-rust-500/40 text-rust-500 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />Delete this business</button>
       </Card>}
     </div>

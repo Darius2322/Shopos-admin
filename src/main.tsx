@@ -6,6 +6,11 @@ import { DialogHost } from './components/DialogHost';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { OfflineBar } from './components/OfflineBar';
 
+import { startNativeBack } from './lib/nativeBack';
+import { installOverlayAutoBack } from './lib/backStack';
+startNativeBack();
+installOverlayAutoBack();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><App /><DialogHost /><UpdatePrompt /><OfflineBar /></React.StrictMode>
 );
