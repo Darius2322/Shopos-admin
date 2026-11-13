@@ -1,3 +1,5 @@
+import { captchaEnabled, getCaptchaToken } from './lib/captcha';
+import { CaptchaBox } from './components/CaptchaBox';
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Bot, Menu, RefreshCw } from 'lucide-react';
@@ -93,16 +95,20 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [human, setHuman] = useState(!captchaEnabled);
+  const [capKey, setCapKey] = useState(0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const captchaToken = await getCaptchaToken();
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: captchaToken ? { captchaToken } : undefined });
       if (error) throw error;
       if (data.user) onSignedIn(data.user.id);
     } catch (err) {
       setError(friendlyError(err, 'Sign in failed. Please try again.'));
+      setCapKey((n) => n + 1);
     } finally { setBusy(false); }
   }
 
@@ -115,8 +121,9 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
         <form onSubmit={submit} className="card p-4 space-y-3">
           <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <CaptchaBox onChange={setHuman} resetKey={capKey} />
           {error && <p className="text-xs text-rust-500">{error}</p>}
-          <button className="btn-primary w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          <button className="btn-primary w-full" disabled={busy || !human}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>
         <div className="mt-4 max-w-xs mx-auto w-full"><DownloadApp app="admin" /></div>
         <p className="text-xs text-slate-500 mt-5 text-center max-w-xs mx-auto">
