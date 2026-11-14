@@ -28,7 +28,7 @@ let preToken: string | undefined;
 export function provideCaptchaToken(t?: string) { preToken = t; }
 
 /** Renders a visible Turnstile widget into `el` (used by the inline login box). Returns a cleanup function. */
-export function mountCaptcha(el: HTMLElement, cb: { onToken: (t: string) => void; onReset: () => void; onError: () => void }): () => void {
+export function mountCaptcha(el: HTMLElement, cb: { onToken: (t: string) => void; onReset: () => void; onError: (code?: string) => void }): () => void {
   let id: string | null = null; let dead = false; let apiRef: TurnstileApi | null = null;
   void load().then((api) => {
     if (dead) return;
@@ -39,7 +39,7 @@ export function mountCaptcha(el: HTMLElement, cb: { onToken: (t: string) => void
         callback: (t: string) => cb.onToken(t),
         'expired-callback': () => cb.onReset(),
         'timeout-callback': () => cb.onReset(),
-        'error-callback': () => cb.onError() });
+        'error-callback': (c?: unknown) => { cb.onError(String(c ?? '')); return true; } });
     } catch { cb.onError(); }
   });
   return () => { dead = true; try { if (id && apiRef) apiRef.remove(id); } catch { /* ignore */ } };

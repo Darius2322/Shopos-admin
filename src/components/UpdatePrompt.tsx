@@ -43,7 +43,7 @@ export function UpdatePrompt() {
       <div className="relative card w-full max-w-sm p-5 space-y-3 text-center">
         <div className="mx-auto w-12 h-12 rounded-full bg-field-50 text-field-700 flex items-center justify-center">{apk ? <Download className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}</div>
         <h3 className="font-display font-semibold text-lg">{apk ? 'New app version ready' : 'Update available'}</h3>
-        <p className="text-sm text-slate-500">{apk ? `Version ${apk} is ready. Tap Update now, then open the downloaded file and tap Install. It installs over this app: do not uninstall.` : 'A newer version is ready. It takes a few seconds.'}</p>
+        <p className="text-sm text-slate-500">{apk ? `Version ${apk} is ready (you have ${mine ?? 'an older one'}). Tap Update now, then open the downloaded file and tap Install. It installs over this app: do not uninstall.` : 'A newer version is ready. It takes a few seconds.'}</p>
         <button onClick={() => { if (apk) { openApk('ShopOS-Admin.apk'); later(); } else window.location.reload(); }} className="btn-primary w-full min-h-[48px]">Update now</button>
         <button onClick={later} className="btn-secondary w-full">Remind me later</button>
       </div>

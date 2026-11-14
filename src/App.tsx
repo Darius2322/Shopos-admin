@@ -1,3 +1,4 @@
+import { checkForNewVersion, flash } from './lib/checkUpdate';
 import GoLive from './pages/GoLive';
 import { captchaEnabled, getCaptchaToken } from './lib/captcha';
 import { CaptchaBox } from './components/CaptchaBox';
@@ -157,10 +158,12 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   async function refreshAll() {
     if (refreshing) return;
     setRefreshing(true);
-    window.dispatchEvent(new Event('shopos:check-update'));
+    const r = await checkForNewVersion();
+    if (r.found) { window.dispatchEvent(new Event('shopos:check-update')); flash('New version found'); }
+    else flash(navigator.onLine ? 'Up to date' : 'You are offline');
     try {
       const reg = await navigator.serviceWorker?.getRegistration();
-      if (reg) { await reg.update(); if (reg.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); return; } }
+      if (reg?.waiting) { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); return; }
     } catch { /* offline or no service worker: just refresh the data */ }
     setRefreshKey((k) => k + 1);
     window.dispatchEvent(new Event('badges:refresh'));
