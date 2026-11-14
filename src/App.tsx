@@ -1,11 +1,13 @@
 import { checkForNewVersion, flash } from './lib/checkUpdate';
 import GoLive from './pages/GoLive';
+import Notifications from './pages/Notifications';
 import { captchaEnabled, getCaptchaToken } from './lib/captcha';
 import { CaptchaBox } from './components/CaptchaBox';
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Bot, Menu, RefreshCw } from 'lucide-react';
 import { AppStatusPill } from './components/AppStatusPill';
+import { ConnectionPill } from './components/ConnectionPill';
 import { supabase } from './lib/supabase';
 import { Centered } from './components/ui';
 import Packages from './pages/Packages';
@@ -138,7 +140,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 }
 
 const TAB_LABELS: Record<Tab, string> = {
-  mpesa: 'M-Pesa', assistant: 'Assistant', golive: 'Go live',
+  mpesa: 'M-Pesa', assistant: 'Assistant', golive: 'Go live', notifications: 'Notifications',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
   bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
@@ -198,6 +200,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
               {Object.entries(badges).some(([k, v]) => k !== 'packages_expiring' && v > 0) && <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rust-500" aria-label="New items" />}
             </button>
             <span className="hidden lg:inline font-display font-semibold text-sm shrink-0 mr-1">{TAB_LABELS[tab]}</span>
+            <ConnectionPill />
             <AppStatusPill key={`pill${refreshKey}`} supabase={supabase} onOpen={() => selectTab('settings')} />
             <button aria-label="AI assistant" title="AI assistant" onClick={() => selectTab('assistant')} className="p-1.5 text-slate-400 hover:text-ink shrink-0"><Bot className="w-5 h-5" /></button>
             <div className="flex-1 min-w-0"><GlobalSearch supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} /></div>
@@ -210,7 +213,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
         </header>
 
         <main className="flex-1 overflow-y-auto overscroll-contain p-5">
-          <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' || tab === 'golive' ? 'max-w-5xl' : 'max-w-3xl'}`}>
+          <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' || tab === 'golive' || tab === 'notifications' ? 'max-w-5xl' : 'max-w-3xl'}`}>
             {tab === 'dashboard' && <Merged id="dashboard" shop={<Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />} booking={[{ id: 'o', label: 'Overview', node: <BookingInsights supabase={supabase} view="overview" /> }, { id: 'a', label: 'Activity', node: <BookingAdmin supabase={supabase} view="activity" /> }]} />}
             {tab === 'requests' && <Merged id="requests" shop={<OwnerRequests supabase={supabase} />} booking={[{ id: 'apps', label: 'Applications', node: <Bookings supabase={supabase} view="apps" /> }]} />}
             {tab === 'businesses' && (
@@ -234,7 +237,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {(tab === 'apps' || tab === 'releases' || tab === 'installers') && <AppsAndUpdates key={tab} supabase={supabase} start={tab === 'installers' ? 'installers' : 'updates'} badges={badges} />}
             {tab === 'analytics' && <Merged id="analytics" shop={<Analytics supabase={supabase} />} booking={[{ id: 'an', label: 'Analytics', node: <BookingAdmin supabase={supabase} view="analytics" /> }, { id: 'rep', label: 'Reports', node: <BookingInsights supabase={supabase} view="reports" /> }, { id: 'rev', label: 'Revenue', node: <BookingAdmin supabase={supabase} view="revenue" /> }]} />}
             {tab === 'monitor' && <Monitor supabase={supabase} />}
-            {tab === 'golive' && <GoLive supabase={supabase} />}
+            {tab === 'golive' && <GoLive supabase={supabase} onGoNotifications={() => selectTab('notifications')} />}
+            {tab === 'notifications' && <Notifications supabase={supabase} />}
             {tab === 'mpesa' && <Mpesa supabase={supabase} />}
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Merged id="packages" shop={<Packages supabase={supabase} />} booking={[{ id: 'plans', label: 'Booking plans & fees', node: <BookingAdmin supabase={supabase} view="plans" /> }]} />}
