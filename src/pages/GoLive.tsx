@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity } from 'lucide-react';
+import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, Bell } from 'lucide-react';
 import { Card, Skeleton } from '../components/ui';
 import { askConfirm, showAlert } from '../lib/dialog';
 
@@ -20,7 +20,7 @@ interface Meta { version?: string; builtAt?: string; size?: number; sha256?: str
 interface Run { id: number; number: number; status: string; conclusion: string | null; at: string; url: string }
 interface Ping { url: string; ok: boolean; status: number; ms: number }
 interface LogRow { id: string; at: string; app: string; action: string; from_sha: string | null; to_sha: string | null; note: string | null }
-type Sub = 'overview' | 'release' | 'history' | 'apps' | 'links' | 'activity';
+type Sub = 'overview' | 'release' | 'history' | 'apps' | 'preview' | 'notify' | 'links' | 'activity';
 type Any = Record<string, any>;
 
 const ERR: Record<string, string> = {
@@ -42,7 +42,108 @@ function span(from?: string | null, to: number | string = Date.now()) {
   return `${m} min`;
 }
 const mb = (n?: number) => (n ? `${(n / 1048576).toFixed(1)} MB` : '—');
-const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Android apps', Smartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
+const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Android apps', Smartphone], ['preview', 'Preview', MonitorSmartphone], ['notify', 'Notifications', Bell], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
+
+
+const DEVICES: { id: string; label: string; w: number; h: number }[] = [
+  { id: 'phone', label: 'Phone', w: 390, h: 780 }, { id: 'small', label: 'Small phone', w: 360, h: 640 },
+  { id: 'tablet', label: 'Tablet', w: 768, h: 1024 }, { id: 'desktop', label: 'Desktop', w: 1180, h: 760 },
+];
+const TARGETS: { id: string; label: string; path: string; staging?: string; prod: string }[] = [
+  { id: 'owner', label: 'Owner app / website', path: '/', staging: STAGING, prod: PROD },
+  { id: 'booker', label: 'Booker app', path: '/book/app', staging: STAGING, prod: PROD },
+  { id: 'admin', label: 'Admin portal', path: '/', prod: ADMIN },
+];
+
+/** Look at staging and production, in a phone, tablet or desktop frame, side by side if you like, without leaving the portal. */
+function Preview({ staging, live }: { staging?: Br | null; live?: Br | null }) {
+  const [target, setTarget] = useState('owner'); const [env, setEnv] = useState<'staging' | 'prod'>('staging'); const [dev, setDev] = useState('phone');
+  const [both, setBoth] = useState(false); const [custom, setCustom] = useState(''); const [nonce, setNonce] = useState(0);
+  const [box, setBox] = useState<HTMLDivElement | null>(null); const [avail, setAvail] = useState(360);
+  useEffect(() => { if (!box) return; const ro = new ResizeObserver(() => setAvail(box.clientWidth)); ro.observe(box); setAvail(box.clientWidth); return () => ro.disconnect(); }, [box]);
+  const t = TARGETS.find((x) => x.id === target)!; const d = DEVICES.find((x) => x.id === dev)!;
+  const path = custom.trim() ? (custom.trim().startsWith('/') ? custom.trim() : '/' + custom.trim()) : t.path;
+  const url = (e: 'staging' | 'prod') => { const base = e === 'staging' ? t.staging : t.prod; return base ? base + path : null; };
+  const panes: ('staging' | 'prod')[] = both ? ['staging', 'prod'] : [env];
+  const each = both ? (avail - 12) / 2 : avail;
+  const scale = Math.min(1, Math.max(0.25, each / d.w));
+  const info = (e: 'staging' | 'prod') => (e === 'staging' ? staging : live);
+  const chip = (on: boolean) => `text-xs px-3 py-1.5 rounded-full border ${on ? 'bg-field-500 text-white border-field-500' : 'border-slate-600 text-slate-300'}`;
+  return (
+    <div className="space-y-3">
+      <Card className="p-3 space-y-2.5">
+        <div className="flex flex-wrap gap-2">{TARGETS.map((x) => <button key={x.id} onClick={() => { setTarget(x.id); setCustom(''); if (!x.staging) setEnv('prod'); }} className={chip(target === x.id)}>{x.label}</button>)}</div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button onClick={() => setEnv('staging')} disabled={!t.staging || both} className={`${chip(env === 'staging' && !both)} disabled:opacity-40`}>Staging (testing)</button>
+          <button onClick={() => setEnv('prod')} disabled={both} className={`${chip(env === 'prod' && !both)} disabled:opacity-40`}>Production (live)</button>
+          {t.staging && <button onClick={() => setBoth((b) => !b)} className={chip(both)}>Side by side</button>}
+          <span className="text-slate-600">|</span>
+          {DEVICES.map((x) => <button key={x.id} onClick={() => setDev(x.id)} className={chip(dev === x.id)}>{x.label}</button>)}
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Open a page, e.g. /book/swat or /products" className="input text-xs flex-1 min-w-[12rem]" />
+          <button onClick={() => setNonce((n) => n + 1)} className="btn-secondary text-xs inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />Reload</button>
+        </div>
+        {!t.staging && <p className="text-[11px] text-slate-500">The admin portal has no staging copy, so only production can be previewed.</p>}
+        <p className="text-[11px] text-slate-500">Sign in inside the frame to test. A frame is a browser preview: phone buttons such as Back and push notifications only work in the installed Android app.</p>
+      </Card>
+      <div ref={setBox} className="w-full">
+        <div className={`flex gap-3 ${both ? 'items-start' : 'justify-center'}`}>
+          {panes.map((e) => { const u = url(e); return (
+            <div key={e} className="space-y-1.5" style={{ width: d.w * scale }}>
+              <div className="flex items-center justify-between gap-2 text-xs"><span className={`px-2 py-0.5 rounded-full ${e === 'prod' ? 'bg-field-500/15 text-field-500' : 'bg-amber-500/15 text-amber-500'}`}>{e === 'prod' ? 'PRODUCTION' : 'STAGING'}</span>
+                {u && <a href={u} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-slate-400 hover:text-ink">Open<ExternalLink className="w-3 h-3" /></a>}</div>
+              <div className="text-[11px] text-slate-500 truncate">{info(e)?.message ?? '—'}{info(e)?.short ? ` · ${info(e)!.short}` : ''}</div>
+              <div className="rounded-[1.75rem] border-4 border-slate-700 bg-black overflow-hidden" style={{ width: d.w * scale, height: d.h * scale }}>
+                {u ? <iframe key={`${e}-${nonce}-${u}-${dev}`} title={`${t.label} ${e}`} src={u} style={{ width: d.w, height: d.h, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0, background: '#fff' }} allow="clipboard-write; camera" />
+                  : <div className="p-4 text-xs text-slate-400">Not available</div>}
+              </div>
+            </div>); })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Are phone notifications set up, and do they reach a phone? */
+function Notify({ supabase, metas }: { supabase: SupabaseClient; metas: Record<string, Meta | null> }) {
+  const [rows, setRows] = useState<{ app: string; phones: number; last: string | null }[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const [diag, setDiag] = useState<{ id: number; at: string; app: string; stage: string; detail: string | null }[]>([]);
+  const load = useCallback(async () => { void supabase.rpc('push_diag_list').then(({ data }) => setDiag((data as typeof diag) ?? [])); const { data, error } = await supabase.rpc('push_health'); if (error) setMsg(error.message); else setRows((data as { app: string; phones: number; last: string | null }[]) ?? []); }, [supabase]);
+  useEffect(() => { void load(); }, [load]);
+  async function test(app: string) {
+    setBusy(true); setMsg(null);
+    const { data, error } = await supabase.rpc('push_test', { p_app: app });
+    setBusy(false);
+    if (error) setMsg(error.message); else setMsg(Number(data) === 0 ? 'No phone has registered for this app yet, so there is nobody to send to. Install the new app, sign in once and allow notifications.' : `Sent to ${data} phone${Number(data) === 1 ? '' : 's'}. Close the app and wait a few seconds. If nothing arrives, the Firebase key in Supabase (FCM_SERVICE_ACCOUNT) is missing or wrong.`);
+  }
+  const apps = [['owner', 'Owner app'], ['booker', 'Booker app'], ['admin', 'Admin app']] as const;
+  const Step = ({ ok, title, children }: { ok: boolean; title: string; children: ReactNode }) => <li className="flex gap-2"><span className={`mt-0.5 shrink-0 ${ok ? 'text-field-500' : 'text-slate-500'}`}>{ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}</span><div><div className="text-sm font-medium">{title}</div><div className="text-xs text-slate-400">{children}</div></div></li>;
+  const anyBuild = apps.some(([id]) => metas[id === 'owner' ? 'owner' : id]?.push); const total = (rows ?? []).reduce((n, r) => n + r.phones, 0);
+  return (
+    <div className="space-y-3">
+      <Card className="p-4 space-y-3"><div className="font-medium text-sm">What is needed for notifications when the app is closed</div>
+        <ul className="space-y-3">
+          <Step ok={anyBuild} title="1. The Android apps are built with Firebase">In Firebase, add three Android apps (com.shopos.app, the admin and the booker package names) and download each google-services.json. In GitHub → shopos-app → Settings → Secrets and variables → Actions, add GOOGLE_SERVICES_OWNER, GOOGLE_SERVICES_ADMIN and GOOGLE_SERVICES_BOOKER (paste the whole file). Then build the apps again. Apps page shows “notifications on” when this worked.</Step>
+          <Step ok={total > 0} title="2. Phones have registered">Open the new app once, sign in and tap Allow when Android asks about notifications. The counts below go up.</Step>
+          <Step ok={false} title="3. Supabase can send through Google">Firebase → Project settings → Service accounts → Generate new private key. In Supabase → Edge Functions → Secrets add FCM_SERVICE_ACCOUNT with the whole JSON file. (This page cannot see secrets, so use the test button to confirm.)</Step>
+        </ul></Card>
+      <Card className="p-4 space-y-2"><div className="flex items-center justify-between"><div className="font-medium text-sm">Phones registered</div><button onClick={() => void load()} className="text-xs text-slate-400 hover:text-ink inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />Refresh</button></div>
+        {rows === null ? <Skeleton rows={2} /> : <ul className="divide-y divide-slate-700/60">{apps.map(([id, label]) => { const r = rows.find((x) => x.app === id); return (
+          <li key={id} className="py-2 flex items-center justify-between gap-2 flex-wrap"><div><div className="text-sm">{label}</div><div className="text-xs text-slate-500">{r ? `${r.phones} phone${r.phones === 1 ? '' : 's'} · last registered ${when(r.last)}` : 'No phones yet'}{metas[id] ? ` · build notifications ${metas[id]?.push ? 'on' : 'off'}` : ''}</div></div>
+            <button onClick={() => void test(id)} disabled={busy} className="btn-secondary text-xs inline-flex items-center gap-1"><Bell className="w-3 h-3" />Send test</button></li>); })}</ul>}
+        {msg && <p className="text-xs text-amber-500">{msg}</p>}
+      </Card>
+      <Card className="p-4 space-y-2"><div className="font-medium text-sm">What the phones report</div>
+        {diag.length === 0 ? <p className="text-xs text-slate-500">Nothing yet. Open the new app on a phone, sign in and allow notifications; each step appears here (permission, Google token, saved). “registration-error” or “permission” tells you what is wrong.</p>
+          : <ul className="text-xs divide-y divide-slate-700/60 max-h-60 overflow-y-auto">{diag.map((x) => <li key={x.id} className="py-1.5 flex justify-between gap-2"><span><b>{x.app}</b> · {x.stage}{x.detail ? ` — ${x.detail}` : ''}</span><span className="text-slate-500 shrink-0">{when(x.at)}</span></li>)}</ul>}</Card>
+      <Card className="p-4 text-xs text-slate-400 space-y-1"><div className="font-medium text-sm text-ink">What rings a phone</div>
+        <div>Admin app: new owner requests, package requests, feature requests, support tickets, reviews, booking applications and desktop setup requests.</div>
+        <div>Owner app (booking account): new and changed bookings, new reviews. Booker app: updates to a customer’s booking. All apps: “update ready” from the Android apps page.</div></Card>
+    </div>
+  );
+}
 
 /** Go live: its own menu. What is on staging and production and for how long, releasing one app or all, moving back to an earlier version,
  * the Android apps, every link, and a log of who released what. */
@@ -179,6 +280,10 @@ export default function GoLive({ supabase }: { supabase: SupabaseClient }) {
         <Card className="p-4 space-y-2"><div className="flex items-center gap-2"><Activity className="w-4 h-4 text-field-500" /><h3 className="font-medium text-sm">Are the sites answering?</h3></div>
           <ul className="text-sm space-y-1.5">{pings.map((p) => <li key={p.url} className="flex items-center justify-between gap-2"><span className="truncate text-slate-400">{p.url.replace('https://', '')}</span><Pill ok={p.ok} text={p.ok ? `${p.status} · ${p.ms} ms` : p.status ? `Error ${p.status}` : 'No answer'} /></li>)}</ul>
         </Card>
+        <Card className="p-4 space-y-2"><div className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-field-500" /><h3 className="font-medium text-sm">Android apps at a glance</h3></div>
+          <ul className="text-sm divide-y divide-slate-700/60">{ANDROID.map((x) => { const m = metas[x.id]; return <li key={x.id} className="py-2 flex items-center justify-between gap-2 flex-wrap"><span>{x.label}</span><span className="text-xs text-slate-400">{m?.version ? `v${m.version} · built ${span(m.builtAt, now)} ago · notifications ${m.push ? 'on' : 'off'}` : 'Not published'}</span></li>; })}</ul>
+          <div className="flex gap-2 pt-1"><button onClick={() => setSub('preview')} className="btn-secondary text-xs">Preview apps</button><button onClick={() => setSub('notify')} className="btn-secondary text-xs">Notification set-up</button></div>
+        </Card>
         {web.ahead > 0 && <Card className="p-4"><div className="text-sm"><b>{web.ahead}</b> change{web.ahead === 1 ? '' : 's'} waiting on staging:</div><ul className="text-xs text-slate-500 space-y-1 mt-2 max-h-44 overflow-y-auto">{web.commits.map((c) => <li key={c.sha}>• {c.message} <span className="text-slate-400">({c.short})</span></li>)}</ul></Card>}
       </>}
 
@@ -219,6 +324,9 @@ export default function GoLive({ supabase }: { supabase: SupabaseClient }) {
         <Card className="p-4 space-y-2"><div className="font-medium text-sm">Recent builds</div>
           {runs.length === 0 ? <p className="text-xs text-slate-500">No builds yet.</p> : <ul className="text-sm space-y-1.5">{runs.map((r) => <li key={r.id} className="flex items-center justify-between gap-2"><span className="text-slate-400">#{r.number} · {when(r.at)}</span><span className="flex items-center gap-2"><Pill ok={r.status === 'completed' ? r.conclusion === 'success' : true} text={r.status === 'completed' ? (r.conclusion === 'success' ? 'Done' : r.conclusion ?? 'Stopped') : 'Building…'} /><A href={r.url}>Log</A></span></li>)}</ul>}</Card>
       </div>}
+
+      {sub === 'preview' && <Preview staging={web?.staging} live={web?.liveCommit ?? web?.main} />}
+      {sub === 'notify' && <Notify supabase={supabase} metas={metas} />}
 
       {sub === 'links' && <Card className="p-4"><ul className="text-sm divide-y divide-slate-700/60">{([
         ['Production app', `${PROD}/`], ['Staging app', `${STAGING}/`], ['Admin portal', `${ADMIN}/`], ['Booker app page', `${PROD}/book/app`],
