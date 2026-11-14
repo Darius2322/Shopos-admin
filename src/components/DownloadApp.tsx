@@ -53,7 +53,7 @@ export function DownloadApp({ app, className = '' }: { app: AppKind; className?:
               <button onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-slate-400"><X className="w-5 h-5" /></button>
             </div>
             {ios ? <p className="text-sm text-slate-600">The Android app is for Android phones. On iPhone, tap the Share button in Safari, then “Add to Home Screen”.</p> : <>
-              <a href={href} download className="btn-primary w-full min-h-[48px] inline-flex items-center justify-center gap-2"><Download className="w-4 h-4" />Download APK{info ? ` (v${info.version}${mb ? `, ${mb}` : ''})` : ''}</a>
+              <a href={href} download onClick={() => { window.dispatchEvent(new CustomEvent('shopos:apk-started', { detail: a.file })); }} className="btn-primary w-full min-h-[48px] inline-flex items-center justify-center gap-2"><Download className="w-4 h-4" />Download APK{info ? ` (v${info.version}${mb ? `, ${mb}` : ''})` : ''}</a>
               {info === null && <p className="text-xs text-amber-600">The app file is not published yet. If the download fails, use the web app below for now.</p>}
               <ol className="space-y-2.5">{[
                 'Tap “Download APK”. If Chrome warns that this type of file can be harmful, tap Download anyway. It is our own app.',

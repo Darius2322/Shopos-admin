@@ -1,12 +1,19 @@
+import { capPlugin } from './capPlugin';
 /** A new Android app file is out: ring the phone once per version with a notification that opens the download. */
 type Plug = Record<string, (...a: any[]) => any>;
-const P = (n: string): Plug | null => { try { return (window as any).Capacitor?.Plugins?.[n] ?? null; } catch { return null; } };
+const P = (n: string): Plug | null => capPlugin<Plug>(n);
 const KEY = 'shopos:update-notified';
 let wired = false;
 
 export function apkUrl(file: string) { return `https://www.shopos.co.ke/downloads/android/${file}`; }
 /** Opens the file in the phone's browser, which downloads it (the app's own window cannot save files). */
-export function openApk(file: string) { try { window.open(apkUrl(file), '_blank', 'noopener'); } catch { window.location.href = apkUrl(file); } }
+export function openApk(file: string) {
+  const url = apkUrl(file);
+  window.dispatchEvent(new CustomEvent('shopos:apk-started', { detail: file }));
+  const br = P('Browser');
+  if (br?.open) { void Promise.resolve(br.open({ url })).catch(() => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } }); return; }
+  try { window.open(url, '_blank', 'noopener'); } catch { window.location.href = url; }
+}
 
 export async function notifyNewApk(version: string, file: string, appName: string) {
   let seen = ''; try { seen = localStorage.getItem(KEY) ?? ''; } catch { /* ignore */ }

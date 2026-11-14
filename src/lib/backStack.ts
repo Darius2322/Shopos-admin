@@ -137,3 +137,16 @@ export function installRootGuard(isApp: boolean) {
     window.history.pushState({ ...(st() ?? {}), soRoot: false }, '');
   });
 }
+
+/** What the phone's own back button does inside the Android app (called from nativeBack). Returns false when the app should close. */
+export function hardwareBack(): boolean {
+  // 1) a pop-up, sheet or tab step is open: going back in history closes it (the dispatcher above reacts to it)
+  if (overlays.length || (tabHandlers.length && typeof st()?.soTab === 'string')) { window.history.back(); return true; }
+  // 2) there is an earlier page inside the app (React Router numbers every step, so this does not depend on the phone's own bookkeeping)
+  const raw = (window.history.state as { idx?: unknown } | null)?.idx; const idx = typeof raw === 'number' ? raw : 0;
+  if (idx > 0) { window.history.back(); return true; }
+  if (trail.length > 1 && navFn) { trail.pop(); navFn(trail[trail.length - 1]); return true; }
+  // 3) first screen: the first press asks, the second leaves
+  if (Date.now() - armedAt < 1800) { armedAt = 0; return false; }
+  armedAt = Date.now(); toastExit(); return true;
+}

@@ -1,9 +1,10 @@
+import { capPlugin } from './capPlugin';
 import { supabase } from './supabase';
 
 /** Phone push notifications (Android app only). The phone gets a token from Google (FCM) and gives it to ShopOS, so the server can
  * ring the phone the moment something happens, even when the app is closed. In a normal browser this does nothing. */
 type Plug = Record<string, (...a: any[]) => any>;
-const P = (n: string): Plug | null => { try { return (window as any).Capacitor?.Plugins?.[n] ?? null; } catch { return null; } };
+const P = (n: string): Plug | null => capPlugin<Plug>(n);
 let started = false;
 
 async function start(onToken: (t: string) => void) {

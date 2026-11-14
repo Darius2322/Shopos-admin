@@ -1,3 +1,4 @@
+import GoLive from './pages/GoLive';
 import { captchaEnabled, getCaptchaToken } from './lib/captcha';
 import { CaptchaBox } from './components/CaptchaBox';
 import { useEffect, useState } from 'react';
@@ -136,7 +137,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 }
 
 const TAB_LABELS: Record<Tab, string> = {
-  mpesa: 'M-Pesa', assistant: 'Assistant',
+  mpesa: 'M-Pesa', assistant: 'Assistant', golive: 'Go live',
   dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
   bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
@@ -206,7 +207,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
         </header>
 
         <main className="flex-1 overflow-y-auto overscroll-contain p-5">
-          <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' ? 'max-w-5xl' : 'max-w-3xl'}`}>
+          <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' || tab === 'golive' ? 'max-w-5xl' : 'max-w-3xl'}`}>
             {tab === 'dashboard' && <Merged id="dashboard" shop={<Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />} booking={[{ id: 'o', label: 'Overview', node: <BookingInsights supabase={supabase} view="overview" /> }, { id: 'a', label: 'Activity', node: <BookingAdmin supabase={supabase} view="activity" /> }]} />}
             {tab === 'requests' && <Merged id="requests" shop={<OwnerRequests supabase={supabase} />} booking={[{ id: 'apps', label: 'Applications', node: <Bookings supabase={supabase} view="apps" /> }]} />}
             {tab === 'businesses' && (
@@ -230,6 +231,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {(tab === 'apps' || tab === 'releases' || tab === 'installers') && <AppsAndUpdates key={tab} supabase={supabase} start={tab === 'installers' ? 'installers' : 'updates'} badges={badges} />}
             {tab === 'analytics' && <Merged id="analytics" shop={<Analytics supabase={supabase} />} booking={[{ id: 'an', label: 'Analytics', node: <BookingAdmin supabase={supabase} view="analytics" /> }, { id: 'rep', label: 'Reports', node: <BookingInsights supabase={supabase} view="reports" /> }, { id: 'rev', label: 'Revenue', node: <BookingAdmin supabase={supabase} view="revenue" /> }]} />}
             {tab === 'monitor' && <Monitor supabase={supabase} />}
+            {tab === 'golive' && <GoLive supabase={supabase} />}
             {tab === 'mpesa' && <Mpesa supabase={supabase} />}
             {tab === 'assistant' && <Assistant />}
             {tab === 'packages' && <Merged id="packages" shop={<Packages supabase={supabase} />} booking={[{ id: 'plans', label: 'Booking plans & fees', node: <BookingAdmin supabase={supabase} view="plans" /> }]} />}
