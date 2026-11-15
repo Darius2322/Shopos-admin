@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket } from 'lucide-react';
+import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive';
+export type Tab = 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -25,6 +25,7 @@ export const TABS: [Tab, string, any][] = [
   ['database', 'Database', Database],
   ['assistant', 'Assistant', Bot],
   ['notifications', 'Notifications', Bell],
+  ['website', 'Website', Globe],
   ['golive', 'Go live', Rocket],
   ['monitor', 'Monitor', Terminal],
   ['audit', 'Audit Logs', ScrollText],
@@ -47,6 +48,7 @@ const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
   { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'bookings', 'branches', 'softdelete', 'businesstypes'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
+  { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
   { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'monitor', 'audit', 'settings'] },
