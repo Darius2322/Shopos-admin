@@ -266,7 +266,7 @@ function BizDetail({ b, supabase, stats, tab, onTab, onBack, onStatus, onEdit, o
   const phone = (b.phone ?? '').replace(/[^\d+]/g, '');
   const wa = phone.replace(/^\+/, '').replace(/^0/, '254');
   const reviews = data.reviews ?? [];
-  const reqs = reviews.filter((r) => r.hide_requested && !r.hidden).length;
+  const reqs = reviews.filter((r) => r.hide_requested).length;
   const tabs: [string, string][] = [['overview', 'Overview'], ['bookings', 'Bookings'], ['services', 'Services & chairs'], ['team', 'Team'], ['reviews', reqs ? `Reviews (${reqs} to review)` : 'Reviews'], ['manage', 'Manage']];
   const col = b.status === 'active' ? 'bg-field-50 text-field-700' : b.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rust-500/10 text-rust-500';
   const Row = ({ k, v }: { k: string; v: ReactNode }) => <div className="flex justify-between gap-3 text-sm py-1.5 border-b border-slate-700/20"><span className="text-slate-500">{k}</span><span className="text-right break-all">{v ?? '—'}</span></div>;
@@ -307,15 +307,15 @@ function BizDetail({ b, supabase, stats, tab, onTab, onBack, onStatus, onEdit, o
       {tab === 'team' && (data.team == null ? <Skeleton rows={3} /> : data.team.length === 0 ? <EmptyState message="No team or chairs yet." /> : data.team.map((r) => (
         <Card key={r.id} className="p-3 flex items-center justify-between gap-3"><div className="text-sm font-medium">{r.name}</div><div className="text-xs text-slate-500">{r.active === false ? 'inactive' : 'active'}</div></Card>)))}
 
-      {tab === 'reviews' && (data.reviews == null ? <Skeleton rows={3} /> : reviews.length === 0 ? <EmptyState message="No reviews yet." /> : [...reviews].sort((a, c) => Number(!!c.hide_requested && !c.hidden) - Number(!!a.hide_requested && !a.hidden)).map((r) => (
-        <Card key={r.id} className={`p-3 space-y-1 ${r.hide_requested && !r.hidden ? 'border-amber-500/50' : ''}`}>
+      {tab === 'reviews' && (data.reviews == null ? <Skeleton rows={3} /> : reviews.length === 0 ? <EmptyState message="No reviews yet." /> : [...reviews].sort((a, c) => Number(!!c.hide_requested) - Number(!!a.hide_requested)).map((r) => (
+        <Card key={r.id} className={`p-3 space-y-1 ${r.hide_requested ? 'border-amber-500/50' : ''}`}>
           <div className="flex items-center justify-between"><span className="inline-flex gap-0.5">{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`w-3.5 h-3.5 ${n <= r.rating ? 'fill-current text-amber-500' : 'text-slate-500'}`} />)}</span><span className="text-xs text-slate-400">{r.hidden ? 'hidden' : r.hide_requested ? 'owner asked to hide' : 'public'}</span></div>
           {r.comment && <p className="text-sm">{r.comment}</p>}
-          {r.hide_requested && !r.hidden && <p className="text-xs text-amber-600">Owner's reason: {r.hide_reason || '—'}</p>}
+          {r.hide_requested && <p className="text-xs text-amber-600">Owner's reason: {r.hide_reason || '—'}</p>}
           <div className="flex gap-2 pt-1">
             {!r.hidden && <button onClick={() => hideReview(r.id, true)} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><EyeOff className="w-3 h-3" />{r.hide_requested ? 'Approve & hide' : 'Hide'}</button>}
             {r.hidden && <button onClick={() => hideReview(r.id, false)} className="btn-secondary text-xs !py-1 inline-flex items-center gap-1"><Eye className="w-3 h-3" />Show again</button>}
-            {r.hide_requested && !r.hidden && <button onClick={() => { void supabase.from('bk_reviews').update({ hide_requested: false }).eq('id', r.id).then(() => loadTab('reviews')); }} className="btn-secondary text-xs !py-1">Decline</button>}
+            {r.hide_requested && <button onClick={() => { void supabase.from('bk_reviews').update({ hide_requested: false }).eq('id', r.id).then(() => loadTab('reviews')); }} className="btn-secondary text-xs !py-1">Decline</button>}
           </div></Card>)))}
 
       {tab === 'manage' && <Card className="p-4 space-y-3">
