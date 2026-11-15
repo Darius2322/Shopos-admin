@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, Bell } from 'lucide-react';
+import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, ShieldCheck, Bell } from 'lucide-react';
 import { Card, Skeleton } from '../components/ui';
 import { askConfirm, showAlert } from '../lib/dialog';
 
@@ -20,7 +20,7 @@ interface Meta { version?: string; builtAt?: string; size?: number; sha256?: str
 interface Run { id: number; number: number; status: string; conclusion: string | null; at: string; url: string }
 interface Ping { url: string; ok: boolean; status: number; ms: number }
 interface LogRow { id: string; at: string; app: string; action: string; from_sha: string | null; to_sha: string | null; note: string | null }
-type Sub = 'overview' | 'release' | 'history' | 'apps' | 'preview' | 'links' | 'activity';
+type Sub = 'overview' | 'release' | 'history' | 'apps' | 'safety' | 'preview' | 'links' | 'activity';
 type Any = Record<string, any>;
 
 const ERR: Record<string, string> = {
@@ -42,7 +42,7 @@ function span(from?: string | null, to: number | string = Date.now()) {
   return `${m} min`;
 }
 const mb = (n?: number) => (n ? `${(n / 1048576).toFixed(1)} MB` : '—');
-const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Android apps', Smartphone], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
+const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Android apps', Smartphone], ['safety', 'Data safety', ShieldCheck], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
 
 
 const DEVICES: { id: string; label: string; w: number; h: number }[] = [
@@ -102,6 +102,41 @@ function Preview({ staging, live, start }: { staging?: Br | null; live?: Br | nu
             </div>); })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Before any address move: how many phones still have changes that have not reached the server. */
+function DataSafetyPanel({ supabase }: { supabase: SupabaseClient }) {
+  const [ov, setOv] = useState<Record<string, any> | null>(null); const [rows, setRows] = useState<Record<string, any>[]>([]); const [all, setAll] = useState(false); const [err, setErr] = useState('');
+  const load = useCallback(async () => {
+    const a = await supabase.rpc('sync_overview'); if (a.error) { setErr(a.error.message); return; } setErr(''); setOv(a.data as Record<string, any>);
+    const b = await supabase.rpc('sync_devices_list', { p_only_waiting: !all }); if (!b.error) setRows((b.data as Record<string, any>[]) ?? []);
+  }, [supabase, all]);
+  useEffect(() => { void load(); }, [load]);
+  const ready = ov && Number(ov.waiting) === 0 && Number(ov.failed) === 0 && Number(ov.lost) === 0;
+  const Tile = ({ label, value, warn }: { label: string; value: ReactNode; warn?: boolean }) => <div className="rounded-xl border border-slate-700/60 p-3"><div className="text-[11px] text-slate-500">{label}</div><div className={`text-xl font-semibold tnum ${warn ? 'text-amber-500' : ''}`}>{value}</div></div>;
+  return (
+    <div className="space-y-3">
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 font-medium text-sm"><ShieldCheck className="w-4 h-4 text-field-500" />Is it safe to move people to a new address?</div><button onClick={() => void load()} className="text-xs text-slate-400 hover:text-ink inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />Refresh</button></div>
+        {err && <p className="text-xs text-rust-500">{err}</p>}
+        {!ov ? <Skeleton rows={2} /> : <>
+          <p className={`text-sm ${ready ? 'text-field-500' : 'text-amber-500'}`}>{ready ? 'Yes: no phone is reporting unsent changes. Phones that have not opened the app yet are not counted, so keep the old address running for the overlap period.' : `Not yet: ${ov.waiting} phone${Number(ov.waiting) === 1 ? '' : 's'} still ${Number(ov.waiting) === 1 ? 'has' : 'have'} changes waiting (${ov.waiting_items} in total).`}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Tile label="Phones reporting" value={ov.devices} /><Tile label="Seen in 7 days" value={ov.active7} />
+            <Tile label="With changes waiting" value={ov.waiting} warn={Number(ov.waiting) > 0} /><Tile label="Waiting, silent 2+ days" value={ov.silent_waiting} warn={Number(ov.silent_waiting) > 0} />
+            <Tile label="With failed changes" value={ov.failed} warn={Number(ov.failed) > 0} /><Tile label="Refused by server" value={ov.lost} warn={Number(ov.lost) > 0} /><Tile label="Changes waiting" value={ov.waiting_items} warn={Number(ov.waiting_items) > 0} />
+          </div>
+          {(ov.by_app ?? []).length > 0 && <p className="text-xs text-slate-500">{(ov.by_app as { app: string; devices: number; waiting: number }[]).map((x) => `${x.app}: ${x.devices} phones, ${x.waiting} waiting`).join(' · ')}</p>}
+        </>}
+      </Card>
+      <Card className="p-4 space-y-2">
+        <div className="flex items-center justify-between"><div className="font-medium text-sm">{all ? 'All phones' : 'Phones with changes waiting'}</div><button onClick={() => setAll((a) => !a)} className="text-xs text-slate-400 hover:text-ink underline">{all ? 'Show only waiting' : 'Show all'}</button></div>
+        {rows.length === 0 ? <p className="text-xs text-slate-500">{all ? 'No phone has reported yet. Phones report after they get the latest app version and are signed in.' : 'None. Nothing is waiting.'}</p>
+          : <ul className="divide-y divide-slate-700/60 text-xs">{rows.map((r) => <li key={r.device_id} className="py-2 flex justify-between gap-2 flex-wrap"><span><b>{r.app}</b> · {r.who} · v{r.version ?? '?'}</span><span className="text-slate-400">{r.pending} waiting{r.failed > 0 ? ` · ${r.failed} failed` : ''}{r.dead > 0 ? ` · ${r.dead} refused` : ''} · {when(r.updated_at)}</span></li>)}</ul>}
+        <p className="text-[11px] text-slate-500">Phones send only these numbers, no business data. Each phone can also save a backup file of its unsent changes from Settings → Sync Center.</p>
+      </Card>
     </div>
   );
 }
@@ -324,6 +359,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
           {runs.length === 0 ? <p className="text-xs text-slate-500">No builds yet.</p> : <ul className="text-sm space-y-1.5">{runs.map((r) => <li key={r.id} className="flex items-center justify-between gap-2"><span className="text-slate-400">#{r.number} · {when(r.at)}</span><span className="flex items-center gap-2"><Pill ok={r.status === 'completed' ? r.conclusion === 'success' : true} text={r.status === 'completed' ? (r.conclusion === 'success' ? 'Done' : r.conclusion ?? 'Stopped') : 'Building…'} /><A href={r.url}>Log</A></span></li>)}</ul>}</Card>
       </div>}
 
+      {sub === 'safety' && <DataSafetyPanel supabase={supabase} />}
       {sub === 'preview' && <Preview key={previewStart} start={previewStart} staging={web?.staging} live={web?.liveCommit ?? web?.main} />}
 
       {sub === 'links' && <Card className="p-4"><ul className="text-sm divide-y divide-slate-700/60">{([

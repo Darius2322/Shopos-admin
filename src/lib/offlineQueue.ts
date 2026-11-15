@@ -12,6 +12,11 @@ let flushing = false;
 const read = (): Item[] => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } };
 const write = (q: Item[]) => { try { localStorage.setItem(KEY, JSON.stringify(q.slice(-300))); } catch { /* storage may be full */ } window.dispatchEvent(new Event('shopos:queue')); };
 export const pendingCount = () => read().length;
+/** Changes the server refused for good are kept here (not thrown away) so they can be saved in the backup file and looked at. */
+const DEAD = 'shopos.queue.dead.v1';
+export const deadItems = (): (Item & { status: number })[] => { try { return JSON.parse(localStorage.getItem(DEAD) || '[]'); } catch { return []; } };
+const bury = (it: Item, status: number) => { try { localStorage.setItem(DEAD, JSON.stringify([...deadItems(), { ...it, status }].slice(-100))); } catch { /* storage may be full */ } };
+export const queuedItems = (): Item[] => read();
 
 function fake(item: { url: string; method: string; headers: Record<string, string> }): Response {
   const accept = Object.entries(item.headers).find(([k]) => k.toLowerCase() === 'accept')?.[1] ?? '';
@@ -30,7 +35,8 @@ export async function flushQueue(): Promise<void> {
       let res: Response;
       try { res = await fetch(it.url, { method: it.method, headers, body: it.body }); } catch { break; } // still offline: keep the rest
       if (res.status >= 500 || res.status === 401) break; // try again later
-      q = read().filter((x) => x.id !== it.id); write(q); // sent, or refused for good: either way drop it
+      if (res.status >= 400) bury(it, res.status); // refused for good: kept aside, not lost
+      q = read().filter((x) => x.id !== it.id); write(q); // sent, or refused for good: either way drop it from the waiting list
     }
     if (!read().length) window.dispatchEvent(new Event('shopos:back-online'));
   } finally { flushing = false; }
