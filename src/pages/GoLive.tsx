@@ -42,7 +42,7 @@ function span(from?: string | null, to: number | string = Date.now()) {
   return `${m} min`;
 }
 const mb = (n?: number) => (n ? `${(n / 1048576).toFixed(1)} MB` : '—');
-const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Android apps', Smartphone], ['safety', 'Data safety', ShieldCheck], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
+const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Apps', Smartphone], ['safety', 'Data safety', ShieldCheck], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
 
 
 const DEVICES: { id: string; label: string; w: number; h: number }[] = [
@@ -152,6 +152,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   const [hist, setHist] = useState<Br[]>([]); 
   const [runs, setRuns] = useState<Run[]>([]); const [metas, setMetas] = useState<Record<string, Meta | null>>({});
   const [pings, setPings] = useState<Ping[]>([]); const [log, setLog] = useState<LogRow[]>([]);
+  const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
   const [pick, setPick] = useState<'all' | 'owner' | 'admin' | 'booker'>('all');
   const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null); const [done, setDone] = useState<string | null>(null);
@@ -209,12 +210,13 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     if (d.error) { fail(d.error); return; }
     setDone(`Building ${label}. Check the Android apps menu in about 10 minutes.`); void loadAll();
   }
+  useEffect(() => { if (sub !== 'apps' || appTab === 'android') return; void call({ action: 'runs', repo: APP_REPO, workflow: 'desktop' }).then((r) => { if (!r.error) setDeskRuns((r.runs ?? []) as Run[]); }); }, [sub, appTab]);
   async function buildDesktop() {
     if (!(await askConfirm('Build the desktop apps (Windows, Mac and Linux) now? It takes about 15 minutes. When it finishes they appear in the Installer library, and signed-in shop owners can download them.'))) return;
     setBusy(true); setErr(null); setDone(null);
     const d = await call({ action: 'build_desktop', repo: APP_REPO, app: 'desktop' }); setBusy(false);
     if (d.error) { fail(d.error); return; }
-    setDone('Building the desktop apps. Check the Installer library in about 15 minutes.'); void loadAll();
+    setDone('Building the desktop apps. Check the Installer library in about 15 minutes.'); void loadAll(); setAppTab((t) => t);
   }
   async function everything() {
     if (!(await askConfirm('Release EVERYTHING: send the website app and the admin portal from staging to production (where there is something waiting), then build all three Android apps?'))) return;
@@ -336,13 +338,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
 
       {sub === 'release' && web && <div className="space-y-3">
         <ProductCards />
-        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Android apps</div>
-          <p className="text-xs text-slate-400">The apps open the live website, so most changes need no new install. Build new apps only when the app itself changed.</p>
-          <div className="flex flex-wrap gap-2">{(['all', 'owner', 'admin', 'booker'] as const).map((k) => <button key={k} onClick={() => setPick(k)} className={`text-xs px-3 py-1.5 rounded-full border ${pick === k ? 'bg-field-500 text-white border-field-500' : 'border-slate-600 text-slate-300'}`}>{k === 'all' ? 'All three' : k === 'owner' ? 'Owner app' : k === 'admin' ? 'Admin app' : 'Booker app'}</button>)}</div>
-          <div className="flex flex-wrap gap-2"><button onClick={() => void build(pick)} disabled={busy} className="btn-primary text-xs">Build {pick === 'all' ? 'all apps' : `${pick} app`}</button><button onClick={() => void tellPhones(pick)} disabled={busy} className="btn-secondary text-xs">Tell phones it is ready</button></div></Card>
-        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Desktop apps</div>
-          <p className="text-xs text-slate-400">Windows, Mac and Linux programs for shop computers. Owners download them from their account after registering.</p>
-          <div className="flex flex-wrap gap-2"><button onClick={() => void buildDesktop()} disabled={busy} className="btn-primary text-xs">Build desktop apps</button><a href={`https://github.com/${APP_REPO}/actions/workflows/desktop-build.yml`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">See the build</a></div></Card>
+        <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p><button onClick={() => setSub('apps')} className="btn-secondary text-xs mt-2">Open Apps</button></Card>
         <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
           <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
       </div>}
@@ -361,12 +357,26 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
       </div>}
 
       {sub === 'apps' && <div className="space-y-3">
+        <div className="flex gap-1.5">{([['android', 'Android'], ['desktop', 'Desktop'], ['mac', 'Mac']] as const).map(([id, l]) => <button key={id} onClick={() => setAppTab(id)} className={`text-sm px-4 py-1.5 rounded-full border ${appTab === id ? 'bg-field-500 text-white border-field-500' : 'border-slate-600 text-slate-300'}`}>{l}</button>)}</div>
+        {appTab === 'android' && <>
+        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Build Android apps</div>
+          <p className="text-xs text-slate-400">The apps open the live website, so most changes need no new install. Build new apps only when the app itself changed.</p>
+          <div className="flex flex-wrap gap-2">{(['all', 'owner', 'admin', 'booker'] as const).map((k) => <button key={k} onClick={() => setPick(k)} className={`text-xs px-3 py-1.5 rounded-full border ${pick === k ? 'bg-field-500 text-white border-field-500' : 'border-slate-600 text-slate-300'}`}>{k === 'all' ? 'All three' : k === 'owner' ? 'Owner app' : k === 'admin' ? 'Admin app' : 'Booker app'}</button>)}</div>
+          <div className="flex flex-wrap gap-2"><button onClick={() => void build(pick)} disabled={busy} className="btn-primary text-xs">Build {pick === 'all' ? 'all apps' : `${pick} app`}</button><button onClick={() => void tellPhones(pick)} disabled={busy} className="btn-secondary text-xs">Tell phones it is ready</button></div></Card>
         {ANDROID.map((x) => { const m = metas[x.id]; return (
           <Card key={x.id} className="p-4 space-y-2"><div className="flex items-center justify-between gap-2"><div className="font-medium text-sm">{x.label}</div>{m?.version ? <Pill ok text={`v${m.version}`} /> : <Pill ok={false} text="Not published" />}</div>
             {m && <div className="text-xs text-slate-500 space-y-0.5"><div>Built {when(m.builtAt)}{m.builtAt ? ` · ${span(m.builtAt, now)} ago` : ''}</div><div>Size {mb(m.size)} · {m.signed ? 'signed (installs over the old one)' : 'not signed'} · notifications {m.push ? 'on' : 'off (Firebase file missing)'}</div>{m.sha256 && <div className="break-all">SHA-256 {m.sha256}</div>}</div>}
             <div className="flex flex-wrap gap-2 text-xs"><a href={`${PROD}/downloads/android/${x.file}`} className="btn-secondary inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" />Download</a><button onClick={() => copy(`${PROD}/downloads/android/${x.file}`)} className="btn-secondary inline-flex items-center gap-1"><Copy className="w-3 h-3" />Copy link</button><button onClick={() => void build(x.id)} disabled={busy} className="btn-secondary">Build this app</button><button onClick={() => void tellPhones(x.id)} disabled={busy} className="btn-secondary">Tell phones</button></div></Card>); })}
         <Card className="p-4 space-y-2"><div className="font-medium text-sm">Recent builds</div>
           {runs.length === 0 ? <p className="text-xs text-slate-500">No builds yet.</p> : <ul className="text-sm space-y-1.5">{runs.map((r) => <li key={r.id} className="flex items-center justify-between gap-2"><span className="text-slate-400">#{r.number} · {when(r.at)}</span><span className="flex items-center gap-2"><Pill ok={r.status === 'completed' ? r.conclusion === 'success' : true} text={r.status === 'completed' ? (r.conclusion === 'success' ? 'Done' : r.conclusion ?? 'Stopped') : 'Building…'} /><A href={r.url}>Log</A></span></li>)}</ul>}</Card>
+        </>}
+        {appTab !== 'android' && <>
+        <Card className="p-4 space-y-2"><div className="font-medium text-sm">{appTab === 'mac' ? 'Mac app' : 'Desktop apps (Windows and Linux)'}</div>
+          <p className="text-xs text-slate-400">One build makes the Windows, Mac and Linux programs together. When it finishes they appear in the Installer library, and signed-in shop owners can download them from their account.{appTab === 'mac' ? ' The Mac file is not code-signed: on first open, right-click it and choose Open.' : ' Windows may show a SmartScreen warning the first time: More info, then Run anyway.'}</p>
+          <div className="flex flex-wrap gap-2"><button onClick={() => void buildDesktop()} disabled={busy} className="btn-primary text-xs">Build {appTab === 'mac' ? 'Mac' : 'desktop'} apps</button><a href={`https://github.com/${APP_REPO}/actions/workflows/desktop-build.yml`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">See the build</a></div></Card>
+        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Recent desktop builds</div>
+          {deskRuns.length === 0 ? <p className="text-xs text-slate-500">No builds yet.</p> : <ul className="text-sm space-y-1.5">{deskRuns.map((r) => <li key={r.id} className="flex items-center justify-between gap-2"><span className="text-slate-400">#{r.number} · {when(r.at)}</span><a href={r.url} target="_blank" rel="noreferrer" className="text-field-400 underline text-xs">{r.status === 'completed' ? (r.conclusion === 'success' ? 'Done' : 'Failed') : 'Building…'}</a></li>)}</ul>}</Card>
+        </>}
       </div>}
 
       {sub === 'safety' && <DataSafetyPanel supabase={supabase} />}
