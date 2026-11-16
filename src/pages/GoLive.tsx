@@ -152,6 +152,11 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   const [hist, setHist] = useState<Br[]>([]); 
   const [runs, setRuns] = useState<Run[]>([]); const [metas, setMetas] = useState<Record<string, Meta | null>>({});
   const [pings, setPings] = useState<Ping[]>([]); const [log, setLog] = useState<LogRow[]>([]);
+  type Ver = { version: string | null; commit: string | null; builtAt: string | null } | null;
+  type Sched = { id: string; run_at: string; note: string | null; status: string; result: string | null };
+  const [vers, setVers] = useState<{ production: Ver; staging: Ver; admin: Ver } | null>(null);
+  const [sched, setSched] = useState<Sched[]>([]); const [schedAt, setSchedAt] = useState(''); const [schedNote, setSchedNote] = useState('');
+  const [prevWeb, setPrevWeb] = useState<Br[]>([]); const [opening, setOpening] = useState<string | null>(null);
   const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
   const [pick, setPick] = useState<'all' | 'owner' | 'admin' | 'booker'>('all');
   const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true);
@@ -190,6 +195,14 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   }, [call]);
   useEffect(() => { void loadHist(histApp); }, [histApp, loadHist]);
 
+  const loadSched = useCallback(async () => { const { data } = await supabase.from('release_schedule').select('id, run_at, note, status, result').order('run_at', { ascending: false }).limit(10); setSched((data ?? []) as Sched[]); }, [supabase]);
+  useEffect(() => {
+    if (sub !== 'release') return;
+    void call({ action: 'versions' }).then((v) => { if (!v.error) setVers(v as never); });
+    void loadSched();
+    void call({ action: 'history', repo: APP_REPO, app: 'web', n: 40 }).then((h) => setPrevWeb(h.error ? [] : ((h.commits ?? []) as Br[]).filter((c) => !c.build && (c.parents ?? 1) <= 2)));
+    const t = window.setInterval(() => void loadSched(), 30000); return () => window.clearInterval(t);
+  }, [sub, call, loadSched]);
   const fail = (code?: string) => setErr(ERR[code ?? ''] ?? 'That did not work. Try again.');
   async function promote(which: 'web' | 'admin'): Promise<boolean> {
     const st = which === 'web' ? web : adm; if (!st?.staging) return false;
@@ -211,6 +224,67 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     setDone(`Building ${label}. Check the Android apps menu in about 10 minutes.`); void loadAll();
   }
   useEffect(() => { if (sub !== 'apps' || appTab === 'android') return; void call({ action: 'runs', repo: APP_REPO, workflow: 'desktop' }).then((r) => { if (!r.error) setDeskRuns((r.runs ?? []) as Run[]); }); }, [sub, appTab]);
+  async function scheduleRelease() {
+    if (!schedAt) { setErr('Pick the date and time first.'); return; }
+    const at = new Date(schedAt);
+    if (isNaN(at.getTime()) || at.getTime() < Date.now() + 60_000) { setErr('Pick a time at least a minute from now.'); return; }
+    setErr(null);
+    const { error } = await supabase.from('release_schedule').insert({ run_at: at.toISOString(), note: schedNote.trim() || null });
+    if (error) { setErr('Could not save the schedule.'); return; }
+    setSchedAt(''); setSchedNote(''); setDone(`Scheduled for ${when(at.toISOString())}. Staging goes to production by itself at that time.`); void loadSched();
+  }
+  async function cancelSchedule(id: string) { if (!(await askConfirm('Cancel this scheduled release?'))) return; await supabase.from('release_schedule').update({ status: 'cancelled' }).eq('id', id).eq('status', 'pending'); void loadSched(); }
+  async function openVersion(c: Br) {
+    setOpening(c.sha); setErr(null);
+    const d = await call({ action: 'deployment_url', repo: APP_REPO, app: 'web', sha: c.sha });
+    setOpening(null);
+    if (d.error || !d.url) { setErr('There is no saved copy of that version to open. Older ones may have been cleaned up.'); return; }
+    window.open(d.url as string, '_blank', 'noopener');
+  }
+  const nothingToRelease = !web || web.ahead === 0;
+  const verLine = (v: Ver | undefined) => v ? `v${v.version ?? '?'} · ${v.commit ? v.commit.slice(0, 7) : 'unknown build'} · built ${when(v.builtAt)}` : 'Could not read the version';
+  const renderExtras = () => (
+    <>
+      <Card className="p-4 space-y-3">
+        <div className="font-medium text-sm">Running now</div>
+        {([['Production', vers?.production, PROD, 'text-field-500'], ['Staging', vers?.staging, STAGING, 'text-amber-500'], ['Admin portal', vers?.admin, ADMIN, 'text-sky-400']] as const).map(([label, v, base, tone]) => (
+          <div key={label} className="rounded-lg border border-slate-700/60 p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between gap-2"><span className={`text-xs font-medium ${tone}`}>{label}</span><span className="text-[11px] text-slate-500">{vers ? verLine(v as Ver) : 'Checking…'}</span></div>
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {label === 'Admin portal' ? <a href={base} target="_blank" rel="noreferrer" className="btn-secondary text-xs inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" />Open portal</a>
+                : ([['Website', '/'], ['Owner app', '/login'], ['Booker app', '/book/app']] as const).map(([n, path]) => <a key={n} href={base + path} target="_blank" rel="noreferrer" className="btn-secondary text-xs inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" />{n}</a>)}
+            </div>
+          </div>))}
+        <p className="text-[11px] text-slate-500">Android apps: owner {metas.owner?.version ? `v${metas.owner.version}` : '—'} · booker {metas.booker?.version ? `v${metas.booker.version}` : '—'} · admin {metas.admin?.version ? `v${metas.admin.version}` : '—'}. The phone apps open the live website, so they always show what is running on production.</p>
+      </Card>
+      <Card className="p-4 space-y-3">
+        <div className="font-medium text-sm">Release and schedule</div>
+        <p className="text-xs text-slate-400">A release sends everything waiting on staging in one go ({web ? web.ahead : '…'} change{web?.ahead === 1 ? '' : 's'} now). Phones and browsers jump straight to the newest version, so nobody has to take the updates one by one.</p>
+        <button onClick={() => void releaseOne('web')} disabled={busy || nothingToRelease} className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium rounded-card px-4 py-2.5 bg-field-600 text-white disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed"><Rocket className="w-4 h-4" />{nothingToRelease ? 'Nothing to release' : `Release ${web!.ahead} change${web!.ahead === 1 ? '' : 's'} now`}</button>
+        <div className="rounded-lg border border-slate-700/60 p-3 space-y-2">
+          <div className="text-xs font-medium">Schedule a release</div>
+          <input type="datetime-local" value={schedAt} onChange={(e) => setSchedAt(e.target.value)} className="input w-full" aria-label="Release date and time" />
+          <input value={schedNote} onChange={(e) => setSchedNote(e.target.value)} placeholder="Note (optional), e.g. Friday night release" maxLength={120} className="input w-full" />
+          <button onClick={() => void scheduleRelease()} disabled={!schedAt} className="btn-secondary text-xs disabled:opacity-50">Schedule it</button>
+          <p className="text-[11px] text-slate-500">At that time (Nairobi time) the database sends staging to production by itself. Whatever is on staging then is what goes live. Needs the GitHub connection (GITHUB_TOKEN).</p>
+          {sched.length > 0 && <ul className="text-xs divide-y divide-slate-700/60">{sched.map((r) => (
+            <li key={r.id} className="py-1.5 flex items-center justify-between gap-2">
+              <span className="min-w-0"><span className="text-slate-300">{when(r.run_at)}</span>{r.note ? ` · ${r.note}` : ''}<span className="block text-[11px] text-slate-500">{r.status === 'pending' ? 'Waiting' : r.status === 'running' ? 'Releasing…' : r.status === 'done' ? 'Released' : r.status === 'nothing' ? 'Nothing was waiting' : r.status === 'cancelled' ? 'Cancelled' : 'Failed'}{r.result ? `: ${r.result}` : ''}</span></span>
+              {r.status === 'pending' && <button onClick={() => void cancelSchedule(r.id)} className="btn-secondary text-xs shrink-0">Cancel</button>}
+            </li>))}</ul>}
+        </div>
+      </Card>
+      <Card className="p-4 space-y-2">
+        <div className="font-medium text-sm">Previous versions</div>
+        <p className="text-xs text-slate-400">Open an earlier version of the website and apps in a new tab to see how it ran. Use Move back to make production that version again.</p>
+        {prevWeb.length === 0 ? <p className="text-xs text-slate-500">Loading…</p> : <ul className="text-sm divide-y divide-slate-700/60">{prevWeb.slice(0, 10).map((c, i) => (
+          <li key={c.sha} className="py-2 flex items-center justify-between gap-2">
+            <span className="min-w-0"><span className="block truncate">{c.message}</span><span className="block text-[11px] text-slate-500">{c.short} · {when(c.date)}{i === 0 ? ' · running now' : ''}</span></span>
+            <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={opening === c.sha} className="btn-secondary text-xs">{opening === c.sha ? 'Opening…' : 'Run it'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
+          </li>))}</ul>}
+      </Card>
+    </>
+  );
   async function buildDesktop() {
     if (!(await askConfirm('Build the desktop apps (Windows, Mac and Linux) now? It takes about 15 minutes. When it finishes they appear in the Installer library, and signed-in shop owners can download them.'))) return;
     setBusy(true); setErr(null); setDone(null);
@@ -282,7 +356,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
                 {isAdmin ? <span className="text-xs text-slate-500">No staging copy</span> : web && (web.ahead > 0 ? <Pill ok={false} text={`${web.ahead} change${web.ahead === 1 ? '' : 's'} ahead`} /> : <Pill ok text="Same as production" />)}</div>
                 {isAdmin ? <div className="text-xs text-slate-500">Changes go live as soon as they are pushed to GitHub.</div> : <><div className="text-sm">{web?.staging?.message ?? '—'}</div><div className="text-xs text-slate-500">{web?.staging?.short ?? ''}{web?.staging?.short ? ' · ' : ''}{when(web?.staging?.date)}</div></>}</div>
               <div className="flex flex-wrap gap-2 text-xs">
-                {!isAdmin && <button onClick={() => void releaseOne('web')} disabled={busy || !web || web.ahead === 0} className="btn-primary text-xs inline-flex items-center gap-1 disabled:opacity-50"><Rocket className="w-3 h-3" />Release to production</button>}
+                {!isAdmin && <button onClick={() => void releaseOne('web')} disabled={busy || !web || web.ahead === 0} className="btn-primary text-xs inline-flex items-center gap-1 disabled:!bg-slate-700 disabled:!text-slate-400 disabled:opacity-100"><Rocket className="w-3 h-3" />{web && web.ahead === 0 ? 'Nothing to release' : 'Release to production'}</button>}
                 <button onClick={() => { setHistProd(d.id); setSub('history'); }} className="btn-secondary text-xs inline-flex items-center gap-1"><Undo2 className="w-3 h-3" />Move back</button>
                 <button onClick={() => { setPreviewStart(d.id); setSub('preview'); }} className="btn-secondary text-xs inline-flex items-center gap-1"><MonitorSmartphone className="w-3 h-3" />Preview</button>
                 <a href={prodUrl} target="_blank" rel="noreferrer" className="btn-secondary text-xs inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" />Open live</a>
@@ -338,6 +412,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
 
       {sub === 'release' && web && <div className="space-y-3">
         <ProductCards />
+        {renderExtras()}
         <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p><button onClick={() => setSub('apps')} className="btn-secondary text-xs mt-2">Open Apps</button></Card>
         <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
           <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
