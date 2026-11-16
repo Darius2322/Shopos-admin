@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
+import { Radio, CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website';
+export type Tab = 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -27,6 +27,7 @@ export const TABS: [Tab, string, any][] = [
   ['notifications', 'Notifications', Bell],
   ['website', 'Website', Globe],
   ['golive', 'Go live', Rocket],
+  ['live', 'Live terminal', Radio],
   ['monitor', 'Monitor', Terminal],
   ['audit', 'Audit Logs', ScrollText],
   ['support', 'Support', LifeBuoy],
@@ -51,7 +52,7 @@ const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
   { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
-  { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'monitor', 'audit', 'settings'] },
+  { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'live', 'monitor', 'audit', 'settings'] },
 ];
 const label = (t: Tab) => TABS.find(([k]) => k === t)![1];
 const iconOf = (t: Tab) => TABS.find(([k]) => k === t)![2];

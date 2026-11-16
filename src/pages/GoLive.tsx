@@ -209,6 +209,13 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     if (d.error) { fail(d.error); return; }
     setDone(`Building ${label}. Check the Android apps menu in about 10 minutes.`); void loadAll();
   }
+  async function buildDesktop() {
+    if (!(await askConfirm('Build the desktop apps (Windows, Mac and Linux) now? It takes about 15 minutes. When it finishes they appear in the Installer library, and signed-in shop owners can download them.'))) return;
+    setBusy(true); setErr(null); setDone(null);
+    const d = await call({ action: 'build_desktop', repo: APP_REPO, app: 'desktop' }); setBusy(false);
+    if (d.error) { fail(d.error); return; }
+    setDone('Building the desktop apps. Check the Installer library in about 15 minutes.'); void loadAll();
+  }
   async function everything() {
     if (!(await askConfirm('Release EVERYTHING: send the website app and the admin portal from staging to production (where there is something waiting), then build all three Android apps?'))) return;
     setBusy(true); setErr(null); setDone(null);
@@ -333,6 +340,9 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
           <p className="text-xs text-slate-400">The apps open the live website, so most changes need no new install. Build new apps only when the app itself changed.</p>
           <div className="flex flex-wrap gap-2">{(['all', 'owner', 'admin', 'booker'] as const).map((k) => <button key={k} onClick={() => setPick(k)} className={`text-xs px-3 py-1.5 rounded-full border ${pick === k ? 'bg-field-500 text-white border-field-500' : 'border-slate-600 text-slate-300'}`}>{k === 'all' ? 'All three' : k === 'owner' ? 'Owner app' : k === 'admin' ? 'Admin app' : 'Booker app'}</button>)}</div>
           <div className="flex flex-wrap gap-2"><button onClick={() => void build(pick)} disabled={busy} className="btn-primary text-xs">Build {pick === 'all' ? 'all apps' : `${pick} app`}</button><button onClick={() => void tellPhones(pick)} disabled={busy} className="btn-secondary text-xs">Tell phones it is ready</button></div></Card>
+        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Desktop apps</div>
+          <p className="text-xs text-slate-400">Windows, Mac and Linux programs for shop computers. Owners download them from their account after registering.</p>
+          <div className="flex flex-wrap gap-2"><button onClick={() => void buildDesktop()} disabled={busy} className="btn-primary text-xs">Build desktop apps</button><a href={`https://github.com/${APP_REPO}/actions/workflows/desktop-build.yml`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">See the build</a></div></Card>
         <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
           <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
       </div>}
