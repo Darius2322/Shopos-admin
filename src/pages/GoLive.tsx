@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, ShieldCheck, Bell } from 'lucide-react';
+import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, ShieldCheck, Bell, BarChart3, Loader2 } from 'lucide-react';
 import { Card, Skeleton } from '../components/ui';
 import { askConfirm, showAlert } from '../lib/dialog';
+import { PlatformAnalytics } from '../components/PlatformAnalytics';
 
 const PROD = 'https://www.shopos.co.ke';
 const STAGING = 'https://shopos-app-staging.vercel.app';
@@ -20,7 +21,7 @@ interface Meta { version?: string; builtAt?: string; size?: number; sha256?: str
 interface Run { id: number; number: number; status: string; conclusion: string | null; at: string; url: string }
 interface Ping { url: string; ok: boolean; status: number; ms: number }
 interface LogRow { id: string; at: string; app: string; action: string; from_sha: string | null; to_sha: string | null; note: string | null }
-type Sub = 'overview' | 'release' | 'history' | 'apps' | 'safety' | 'preview' | 'links' | 'activity';
+type Sub = 'overview' | 'analytics' | 'release' | 'history' | 'apps' | 'safety' | 'preview' | 'links' | 'activity';
 type Any = Record<string, any>;
 
 const ERR: Record<string, string> = {
@@ -42,7 +43,7 @@ function span(from?: string | null, to: number | string = Date.now()) {
   return `${m} min`;
 }
 const mb = (n?: number) => (n ? `${(n / 1048576).toFixed(1)} MB` : '—');
-const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Apps', Smartphone], ['safety', 'Data safety', ShieldCheck], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
+const SUBS: [Sub, string, typeof Rocket][] = [['overview', 'Overview', LayoutDashboard], ['analytics', 'Analytics', BarChart3], ['release', 'Release', Rocket], ['history', 'History & roll back', History], ['apps', 'Apps', Smartphone], ['safety', 'Data safety', ShieldCheck], ['preview', 'Preview', MonitorSmartphone], ['links', 'Links', Link2], ['activity', 'Activity log', ScrollText]];
 
 
 const DEVICES: { id: string; label: string; w: number; h: number }[] = [
@@ -156,7 +157,10 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   type Sched = { id: string; run_at: string; note: string | null; status: string; result: string | null };
   const [vers, setVers] = useState<{ production: Ver; staging: Ver; admin: Ver } | null>(null);
   const [sched, setSched] = useState<Sched[]>([]); const [schedAt, setSchedAt] = useState(''); const [schedNote, setSchedNote] = useState('');
-  const [prevWeb, setPrevWeb] = useState<Br[]>([]); const [opening, setOpening] = useState<string | null>(null);
+  const [prevWeb, setPrevWeb] = useState<Br[]>([]);
+  const [prevJob, setPrevJob] = useState<{ sha: string; url: string; state: 'starting' | 'building' | 'ready' | 'error'; msg?: string } | null>(null);
+  const [access, setAccess] = useState<boolean | null>(null); const [accessBusy, setAccessBusy] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null); const [editAt, setEditAt] = useState('');
   const [relTab, setRelTab] = useState<'now' | 'release' | 'schedule' | 'previous'>('now');
   const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
   const [pick, setPick] = useState<'all' | 'owner' | 'admin' | 'booker'>('all');
@@ -204,6 +208,21 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     void call({ action: 'history', repo: APP_REPO, app: 'web', n: 40 }).then((h) => setPrevWeb(h.error ? [] : ((h.commits ?? []) as Br[]).filter((c) => !c.build && (c.parents ?? 1) <= 2)));
     const t = window.setInterval(() => void loadSched(), 30000); return () => window.clearInterval(t);
   }, [sub, call, loadSched]);
+  useEffect(() => { if (sub !== 'release') return; void supabase.rpc('preview_is_public').then(({ data }) => setAccess(typeof data === 'boolean' ? data : null)); }, [sub, supabase]);
+  useEffect(() => {
+    if (!prevJob || prevJob.state !== 'building') return;
+    let stop = false; let tries = 0; let timer = 0;
+    const tick = async () => {
+      tries++;
+      const { data } = await supabase.functions.invoke('release-preview', { body: { action: 'check', url: prevJob.url } });
+      if (stop) return;
+      if ((data as Any)?.ready) { setPrevJob((j) => (j ? { ...j, state: 'ready' } : j)); return; }
+      if (tries > 50) { setPrevJob((j) => (j ? { ...j, state: 'error', msg: 'It is taking too long. Try again in a minute.' } : j)); return; }
+      timer = window.setTimeout(() => void tick(), 6000);
+    };
+    timer = window.setTimeout(() => void tick(), 4000);
+    return () => { stop = true; window.clearTimeout(timer); };
+  }, [prevJob?.state, prevJob?.url, supabase]);
   const fail = (code?: string) => setErr(ERR[code ?? ''] ?? 'That did not work. Try again.');
   async function promote(which: 'web' | 'admin'): Promise<boolean> {
     const st = which === 'web' ? web : adm; if (!st?.staging) return false;
@@ -236,11 +255,44 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   }
   async function cancelSchedule(id: string) { if (!(await askConfirm('Cancel this scheduled release?'))) return; await supabase.from('release_schedule').update({ status: 'cancelled' }).eq('id', id).eq('status', 'pending'); void loadSched(); }
   async function openVersion(c: Br) {
-    setOpening(c.sha); setErr(null);
-    const d = await call({ action: 'deployment_url', repo: APP_REPO, app: 'web', sha: c.sha });
-    setOpening(null);
-    if (d.error || !d.url) { setErr('There is no saved copy of that version to open. Older ones may have been cleaned up.'); return; }
-    window.open(d.url as string, '_blank', 'noopener');
+    setErr(null); setPrevJob({ sha: c.sha, url: '', state: 'starting' });
+    const { data, error } = await supabase.functions.invoke('release-preview', { body: { action: 'create', sha: c.sha } });
+    const d = (data ?? {}) as Any;
+    if (error || d.error || !d.url) { setPrevJob(null); fail(error ? 'failed' : d.error); return; }
+    setPrevJob({ sha: c.sha, url: d.url as string, state: 'building' });
+  }
+  async function cleanupPreviews() {
+    if (!(await askConfirm('Remove the separate copies made for old versions? Production and staging are not touched. You can open any version again later.'))) return;
+    const { data, error } = await supabase.functions.invoke('release-preview', { body: { action: 'cleanup' } });
+    if (error || (data as Any)?.error) { fail('failed'); return; }
+    setPrevJob(null); setDone(`Removed ${(data as Any).removed ?? 0} old copies.`);
+  }
+  async function toggleAccess() {
+    if (access === null) return; const next = !access;
+    if (next && !(await askConfirm('Turn on open access? Anyone who has the staging or old-version link will be able to open it with no password. Production is not affected.'))) return;
+    setAccessBusy(true); const { error } = await supabase.rpc('admin_set_preview_public', { p_public: next }); setAccessBusy(false);
+    if (error) { setErr('Could not change the setting.'); return; }
+    setAccess(next); setDone(next ? 'Staging and old versions are now open to anyone with the link.' : 'Staging and old versions now ask for an admin sign-in.');
+  }
+  const localInput = (d: Date) => { const z = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
+  const picks = (): [string, string][] => {
+    const n = new Date(); const t = (h: number, addDays = 0) => { const d = new Date(n); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
+    const tonight = t(22); if (tonight.getTime() < n.getTime() + 600000) tonight.setDate(tonight.getDate() + 1);
+    const mon = t(6); do { mon.setDate(mon.getDate() + 1); } while (mon.getDay() !== 1);
+    return [['In 1 hour', localInput(new Date(n.getTime() + 3600000))], ['Tonight 10 pm', localInput(tonight)], ['Tomorrow 6 am', localInput(t(6, 1))], ['Monday 6 am', localInput(mon)]];
+  };
+  async function releaseScheduledNow(id: string) {
+    if (!(await askConfirm('Release staging to production now? It goes out within a minute.'))) return;
+    await supabase.from('release_schedule').update({ run_at: new Date().toISOString() }).eq('id', id).eq('status', 'pending'); setDone('It will go out within a minute.'); void loadSched();
+  }
+  async function saveEdit(id: string) {
+    const at = new Date(editAt);
+    if (isNaN(at.getTime()) || at.getTime() < Date.now() + 60_000) { setErr('Pick a time at least a minute from now.'); return; }
+    setErr(null); await supabase.from('release_schedule').update({ run_at: at.toISOString() }).eq('id', id).eq('status', 'pending'); setEditId(null); setDone(`Moved to ${when(at.toISOString())}.`); void loadSched();
+  }
+  async function cancelAllPending() {
+    if (!(await askConfirm('Cancel every waiting scheduled release?'))) return;
+    await supabase.from('release_schedule').update({ status: 'cancelled' }).eq('status', 'pending'); void loadSched();
   }
   const nothingToRelease = !web || web.ahead === 0;
   const verLine = (v: Ver | undefined) => v ? `v${v.version ?? '?'} · ${v.commit ? v.commit.slice(0, 7) : 'unknown build'} · built ${when(v.builtAt)}` : 'Could not read the version';
@@ -258,6 +310,15 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
         <p className="text-[11px] text-slate-500">Android apps: owner {metas.owner?.version ? `v${metas.owner.version}` : '—'} · booker {metas.booker?.version ? `v${metas.booker.version}` : '—'} · admin {metas.admin?.version ? `v${metas.admin.version}` : '—'}. The phone apps open the live website, so they always show what is running on production.</p>
       </Card>
   );
+  const renderAccess = () => (
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><div className="font-medium text-sm">Staging and preview access</div>
+            <p className="text-xs text-slate-400 mt-0.5">{access === null ? 'Checking…' : access ? 'On: anyone with the link can open staging and old versions, with no password or code. Production is never affected.' : 'Off: staging and old versions ask for an admin sign-in first.'}</p></div>
+          <button role="switch" aria-checked={!!access} aria-label="Staging and preview access" disabled={access === null || accessBusy} onClick={() => void toggleAccess()} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${access ? 'bg-emerald-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${access ? 'translate-x-5' : ''}`} /></button>
+        </div>
+      </Card>
+  );
   const renderRelease = () => (
       <Card className="p-4 space-y-3">
         <div className="font-medium text-sm">Release</div>
@@ -265,31 +326,48 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
         <button onClick={() => void releaseOne('web')} disabled={busy || nothingToRelease} className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium rounded-card px-4 py-2.5 bg-field-600 text-white disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed"><Rocket className="w-4 h-4" />{nothingToRelease ? 'Nothing to release' : `Release ${web!.ahead} change${web!.ahead === 1 ? '' : 's'} now`}</button>
       </Card>
   );
-  const renderSchedule = () => (
-      <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Schedule a release</div>
-        <div className="space-y-2">
-          <div className="hidden" />
+  const renderSchedule = () => {
+    const pending = sched.filter((r) => r.status === 'pending');
+    return (
+      <div className="space-y-3">
+        <Card className="p-4 space-y-3">
+          <div className="font-medium text-sm">Schedule a release</div>
+          <p className="text-xs text-slate-400">At the time you choose, everything waiting on staging goes to production by itself. Phones and browsers jump straight to the newest version.</p>
+          <div className="flex flex-wrap gap-1.5">{picks().map(([l, v]) => <button key={l} onClick={() => setSchedAt(v)} className={`px-2.5 py-1 rounded-full text-xs border ${schedAt === v ? 'bg-emerald-600 text-white border-transparent' : 'border-slate-600 text-slate-300'}`}>{l}</button>)}</div>
           <input type="datetime-local" value={schedAt} onChange={(e) => setSchedAt(e.target.value)} className="input w-full" aria-label="Release date and time" />
           <input value={schedNote} onChange={(e) => setSchedNote(e.target.value)} placeholder="Note (optional), e.g. Friday night release" maxLength={120} className="input w-full" />
-          <button onClick={() => void scheduleRelease()} disabled={!schedAt} className="btn-secondary text-xs disabled:opacity-50">Schedule it</button>
-          <p className="text-[11px] text-slate-500">At that time (Nairobi time) the database sends staging to production by itself. Whatever is on staging then is what goes live. Needs the GitHub connection (GITHUB_TOKEN).</p>
-          {sched.length > 0 && <ul className="text-xs divide-y divide-slate-700/60">{sched.map((r) => (
-            <li key={r.id} className="py-1.5 flex items-center justify-between gap-2">
-              <span className="min-w-0"><span className="text-slate-300">{when(r.run_at)}</span>{r.note ? ` · ${r.note}` : ''}<span className="block text-[11px] text-slate-500">{r.status === 'pending' ? 'Waiting' : r.status === 'running' ? 'Releasing…' : r.status === 'done' ? 'Released' : r.status === 'nothing' ? 'Nothing was waiting' : r.status === 'cancelled' ? 'Cancelled' : 'Failed'}{r.result ? `: ${r.result}` : ''}</span></span>
-              {r.status === 'pending' && <button onClick={() => void cancelSchedule(r.id)} className="btn-secondary text-xs shrink-0">Cancel</button>}
+          <button onClick={() => void scheduleRelease()} disabled={!schedAt} className="btn-primary text-sm disabled:!bg-slate-700 disabled:!text-slate-400">Schedule it</button>
+          <p className="text-[11px] text-slate-500">Nairobi time. Whatever is on staging at that moment is what goes live. Needs the GitHub connection (GITHUB_TOKEN).</p>
+        </Card>
+        <Card className="p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2"><div className="font-medium text-sm">Scheduled releases</div>{pending.length > 1 && <button onClick={() => void cancelAllPending()} className="btn-secondary text-xs">Cancel all waiting</button>}</div>
+          {sched.length === 0 ? <p className="text-xs text-slate-500">Nothing scheduled yet.</p> : <ul className="text-sm divide-y divide-slate-700/60">{sched.map((r) => (
+            <li key={r.id} className="py-2 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0"><span className="block">{when(r.run_at)}{r.note ? <span className="text-slate-400"> · {r.note}</span> : null}</span>
+                  <span className={`block text-[11px] ${r.status === 'pending' ? 'text-amber-400' : r.status === 'done' ? 'text-emerald-400' : r.status === 'failed' ? 'text-red-400' : 'text-slate-500'}`}>{r.status === 'pending' ? 'Waiting' : r.status === 'running' ? 'Releasing…' : r.status === 'done' ? 'Released' : r.status === 'nothing' ? 'Nothing was waiting' : r.status === 'cancelled' ? 'Cancelled' : 'Failed'}{r.result ? `: ${r.result}` : ''}</span></span>
+              </div>
+              {r.status === 'pending' && (editId === r.id
+                ? <div className="flex flex-wrap gap-1.5 items-center"><input type="datetime-local" value={editAt} onChange={(e) => setEditAt(e.target.value)} className="input !py-1 text-xs" aria-label="New time" /><button onClick={() => void saveEdit(r.id)} className="btn-primary text-xs">Save</button><button onClick={() => setEditId(null)} className="btn-secondary text-xs">Back</button></div>
+                : <div className="flex flex-wrap gap-1.5"><button onClick={() => { setEditId(r.id); setEditAt(localInput(new Date(r.run_at))); }} className="btn-secondary text-xs">Change time</button><button onClick={() => void releaseScheduledNow(r.id)} className="btn-secondary text-xs">Release now</button><button onClick={() => void cancelSchedule(r.id)} className="btn-secondary text-xs !text-red-400">Cancel</button></div>)}
             </li>))}</ul>}
-        </div>
-      </Card>
-  );
+        </Card>
+      </div>
+    );
+  };
   const renderPrevious = () => (
       <Card className="p-4 space-y-2">
-        <div className="font-medium text-sm">Previous versions</div>
+        <div className="flex items-center justify-between gap-2"><div className="font-medium text-sm">Previous versions</div><button onClick={() => void cleanupPreviews()} className="btn-secondary text-xs">Remove old copies</button></div>
+        {prevJob && <div className={`rounded-lg border p-3 text-xs space-y-1.5 ${prevJob.state === 'ready' ? 'border-emerald-600/60' : 'border-slate-600'}`} role="status">
+          {(prevJob.state === 'starting' || prevJob.state === 'building') && <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Building a separate copy of version {prevJob.sha.slice(0, 7)}. This takes 1 to 2 minutes. You can leave this screen open.</div>}
+          {prevJob.state === 'ready' && <div className="flex items-center justify-between gap-2"><span>Version {prevJob.sha.slice(0, 7)} is ready on its own address. Production is untouched.</span><a href={prevJob.url} target="_blank" rel="noreferrer" className="btn-primary text-xs inline-flex items-center gap-1 shrink-0"><ExternalLink className="w-3 h-3" />Open it</a></div>}
+          {prevJob.state === 'error' && <span className="text-red-400">{prevJob.msg ?? 'Something went wrong.'}</span>}
+        </div>}
         <p className="text-xs text-slate-400">“Run it” opens that version on its own address, so you can look at it and use it. Production is not touched. It uses the same shop data as production, so avoid saving new records while testing. “Move back” makes production that version again.</p>
         {prevWeb.length === 0 ? <p className="text-xs text-slate-500">Loading…</p> : <ul className="text-sm divide-y divide-slate-700/60">{prevWeb.slice(0, 10).map((c, i) => (
           <li key={c.sha} className="py-2 flex items-center justify-between gap-2">
             <span className="min-w-0"><span className="block truncate">{c.message}</span><span className="block text-[11px] text-slate-500">{c.short} · {when(c.date)}{i === 0 ? ' · running now' : ''}</span></span>
-            <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={opening === c.sha} className="btn-secondary text-xs">{opening === c.sha ? 'Opening…' : 'Run it'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
+            <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={prevJob?.sha === c.sha && (prevJob.state === 'starting' || prevJob.state === 'building')} className="btn-secondary text-xs">{prevJob?.sha === c.sha && prevJob.state !== 'error' ? (prevJob.state === 'ready' ? 'Ready' : 'Building…') : 'Run it'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
           </li>))}</ul>}
       </Card>
   );
@@ -418,15 +496,19 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
         {web.ahead > 0 && <Card className="p-4"><div className="text-sm"><b>{web.ahead}</b> change{web.ahead === 1 ? '' : 's'} waiting on staging:</div><ul className="text-xs text-slate-500 space-y-1 mt-2 max-h-44 overflow-y-auto">{web.commits.map((c) => <li key={c.sha}>• {c.message} <span className="text-slate-400">({c.short})</span></li>)}</ul></Card>}
       </>}
 
+      {sub === 'analytics' && <PlatformAnalytics supabase={supabase} />}
+
       {sub === 'release' && web && <div className="space-y-3">
         <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Release sections">{([['now', 'Running now'], ['release', 'Release'], ['schedule', 'Schedule'], ['previous', 'Previous versions']] as const).map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={relTab === id} onClick={() => setRelTab(id)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border ${relTab === id ? 'bg-field-600 text-white border-transparent' : 'border-slate-600 text-slate-300'}`}>{label}{id === 'schedule' && sched.some((r) => r.status === 'pending') ? ' •' : ''}</button>))}</div>
-        {relTab === 'now' && renderRunning()}
+          <button key={id} role="tab" aria-selected={relTab === id} onClick={() => setRelTab(id)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border ${relTab === id ? 'bg-emerald-600 text-white border-transparent' : 'border-slate-600 text-slate-300'}`}>{label}{id === 'schedule' && sched.some((r) => r.status === 'pending') ? ' •' : ''}</button>))}</div>
+        {relTab === 'now' && <>{renderRunning()}{renderAccess()}</>}
         {relTab === 'release' && <>
           <ProductCards />
-          {renderRelease()}
-          <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
-            <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
+          <div className="grid md:grid-cols-2 gap-3 items-start">
+            {renderRelease()}
+            <Card className="p-4 space-y-3"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
+              <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2 disabled:!bg-slate-700 disabled:!text-slate-400"><Rocket className="w-4 h-4" />Release everything</button></Card>
+          </div>
           <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p></Card>
         </>}
         {relTab === 'schedule' && renderSchedule()}
