@@ -157,6 +157,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   const [vers, setVers] = useState<{ production: Ver; staging: Ver; admin: Ver } | null>(null);
   const [sched, setSched] = useState<Sched[]>([]); const [schedAt, setSchedAt] = useState(''); const [schedNote, setSchedNote] = useState('');
   const [prevWeb, setPrevWeb] = useState<Br[]>([]); const [opening, setOpening] = useState<string | null>(null);
+  const [relTab, setRelTab] = useState<'now' | 'release' | 'schedule' | 'previous'>('now');
   const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
   const [pick, setPick] = useState<'all' | 'owner' | 'admin' | 'booker'>('all');
   const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true);
@@ -243,8 +244,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   }
   const nothingToRelease = !web || web.ahead === 0;
   const verLine = (v: Ver | undefined) => v ? `v${v.version ?? '?'} · ${v.commit ? v.commit.slice(0, 7) : 'unknown build'} · built ${when(v.builtAt)}` : 'Could not read the version';
-  const renderExtras = () => (
-    <>
+  const renderRunning = () => (
       <Card className="p-4 space-y-3">
         <div className="font-medium text-sm">Running now</div>
         {([['Production', vers?.production, PROD, 'text-field-500'], ['Staging', vers?.staging, STAGING, 'text-amber-500'], ['Admin portal', vers?.admin, ADMIN, 'text-sky-400']] as const).map(([label, v, base, tone]) => (
@@ -257,12 +257,19 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
           </div>))}
         <p className="text-[11px] text-slate-500">Android apps: owner {metas.owner?.version ? `v${metas.owner.version}` : '—'} · booker {metas.booker?.version ? `v${metas.booker.version}` : '—'} · admin {metas.admin?.version ? `v${metas.admin.version}` : '—'}. The phone apps open the live website, so they always show what is running on production.</p>
       </Card>
+  );
+  const renderRelease = () => (
       <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Release and schedule</div>
+        <div className="font-medium text-sm">Release</div>
         <p className="text-xs text-slate-400">A release sends everything waiting on staging in one go ({web ? web.ahead : '…'} change{web?.ahead === 1 ? '' : 's'} now). Phones and browsers jump straight to the newest version, so nobody has to take the updates one by one.</p>
         <button onClick={() => void releaseOne('web')} disabled={busy || nothingToRelease} className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium rounded-card px-4 py-2.5 bg-field-600 text-white disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed"><Rocket className="w-4 h-4" />{nothingToRelease ? 'Nothing to release' : `Release ${web!.ahead} change${web!.ahead === 1 ? '' : 's'} now`}</button>
-        <div className="rounded-lg border border-slate-700/60 p-3 space-y-2">
-          <div className="text-xs font-medium">Schedule a release</div>
+      </Card>
+  );
+  const renderSchedule = () => (
+      <Card className="p-4 space-y-3">
+        <div className="font-medium text-sm">Schedule a release</div>
+        <div className="space-y-2">
+          <div className="hidden" />
           <input type="datetime-local" value={schedAt} onChange={(e) => setSchedAt(e.target.value)} className="input w-full" aria-label="Release date and time" />
           <input value={schedNote} onChange={(e) => setSchedNote(e.target.value)} placeholder="Note (optional), e.g. Friday night release" maxLength={120} className="input w-full" />
           <button onClick={() => void scheduleRelease()} disabled={!schedAt} className="btn-secondary text-xs disabled:opacity-50">Schedule it</button>
@@ -274,16 +281,17 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
             </li>))}</ul>}
         </div>
       </Card>
+  );
+  const renderPrevious = () => (
       <Card className="p-4 space-y-2">
         <div className="font-medium text-sm">Previous versions</div>
-        <p className="text-xs text-slate-400">Open an earlier version of the website and apps in a new tab to see how it ran. Use Move back to make production that version again.</p>
+        <p className="text-xs text-slate-400">“Run it” opens that version on its own address, so you can look at it and use it. Production is not touched. It uses the same shop data as production, so avoid saving new records while testing. “Move back” makes production that version again.</p>
         {prevWeb.length === 0 ? <p className="text-xs text-slate-500">Loading…</p> : <ul className="text-sm divide-y divide-slate-700/60">{prevWeb.slice(0, 10).map((c, i) => (
           <li key={c.sha} className="py-2 flex items-center justify-between gap-2">
             <span className="min-w-0"><span className="block truncate">{c.message}</span><span className="block text-[11px] text-slate-500">{c.short} · {when(c.date)}{i === 0 ? ' · running now' : ''}</span></span>
             <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={opening === c.sha} className="btn-secondary text-xs">{opening === c.sha ? 'Opening…' : 'Run it'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
           </li>))}</ul>}
       </Card>
-    </>
   );
   async function buildDesktop() {
     if (!(await askConfirm('Build the desktop apps (Windows, Mac and Linux) now? It takes about 15 minutes. When it finishes they appear in the Installer library, and signed-in shop owners can download them.'))) return;
@@ -411,11 +419,18 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
       </>}
 
       {sub === 'release' && web && <div className="space-y-3">
-        <ProductCards />
-        {renderExtras()}
-        <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p><button onClick={() => setSub('apps')} className="btn-secondary text-xs mt-2">Open Apps</button></Card>
-        <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
-          <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
+        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Release sections">{([['now', 'Running now'], ['release', 'Release'], ['schedule', 'Schedule'], ['previous', 'Previous versions']] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={relTab === id} onClick={() => setRelTab(id)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border ${relTab === id ? 'bg-field-600 text-white border-transparent' : 'border-slate-600 text-slate-300'}`}>{label}{id === 'schedule' && sched.some((r) => r.status === 'pending') ? ' •' : ''}</button>))}</div>
+        {relTab === 'now' && renderRunning()}
+        {relTab === 'release' && <>
+          <ProductCards />
+          {renderRelease()}
+          <Card className="p-4 space-y-2"><div className="font-medium text-sm">Everything at once</div><p className="text-xs text-slate-400">Release the website app and the admin portal (when something is waiting) and build all three Android apps.</p>
+            <button onClick={() => void everything()} disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2"><Rocket className="w-4 h-4" />Release everything</button></Card>
+          <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p></Card>
+        </>}
+        {relTab === 'schedule' && renderSchedule()}
+        {relTab === 'previous' && renderPrevious()}
       </div>}
 
       {sub === 'history' && <div className="space-y-3">
