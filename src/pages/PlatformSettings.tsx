@@ -198,6 +198,7 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [demoOpen, setDemoOpen] = useState(true);
   const [app, setApp] = useState<{ closed: boolean; parts: string[]; message: string; backAt: string }>({ closed: false, parts: [], message: '', backAt: '' });
+  const [bk, setBk] = useState<{ open: boolean; message: string; backAt: string }>({ open: true, message: '', backAt: '' });
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -210,8 +211,8 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
 
   async function load() {
     const [{ data: s }, { data: o }] = await Promise.all([supabase.rpc('app_status'), supabase.rpc('admin_maintenance_overview')]);
-    const d = s as { closed?: boolean; parts?: string[]; message?: string | null; back_at?: string | null; demo_open?: boolean } | null;
-    if (d) { setDemoOpen(d.demo_open !== false); setApp({ closed: !!d.closed, parts: d.parts ?? [], message: d.message ?? '', backAt: futureLocal(d.back_at) }); }
+    const d = s as { closed?: boolean; parts?: string[]; message?: string | null; back_at?: string | null; demo_open?: boolean; bookings_open?: boolean; bookings_message?: string | null; bookings_back_at?: string | null } | null;
+    if (d) { setBk({ open: d.bookings_open !== false, message: d.bookings_message ?? '', backAt: futureLocal(d.bookings_back_at) }); setDemoOpen(d.demo_open !== false); setApp({ closed: !!d.closed, parts: d.parts ?? [], message: d.message ?? '', backAt: futureLocal(d.back_at) }); }
     if (o) setOv(o as Overview);
     setLoaded(true);
   }
@@ -258,6 +259,14 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
     const r = ov.businesses.find((b) => b.business_id === id);
     setWholeBiz(!!r?.closed); setBParts(r?.parts ?? []); setBMsg(r?.message ?? ''); setBBack(futureLocal(r?.back_at));
   }
+  async function saveBookings(open: boolean) {
+    setBusy(true); setMsg(null);
+    const { error } = await supabase.rpc('admin_set_bookings_open', { p_open: open, p_message: bk.message, p_back_at: bk.backAt ? new Date(bk.backAt).toISOString() : null });
+    setBusy(false);
+    if (error) { setMsg('Could not change the booking app. Please try again.'); return; }
+    touched(); setBk({ open, message: open ? '' : bk.message, backAt: open ? '' : bk.backAt });
+    setMsg(open ? 'The booking app is open.' : 'The booking app is closed. Customers see your message and cannot book.');
+  }
   async function toggleDemo(next: boolean) {
     setBusy(true); setMsg(null);
     const { error } = await supabase.rpc('admin_set_demo', { p_open: next });
@@ -299,6 +308,17 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
             {demoOpen
               ? <button onClick={() => void toggleDemo(false)} disabled={busy} className="btn-secondary text-xs shrink-0">Close the demo</button>
               : <button onClick={() => void toggleDemo(true)} disabled={busy} className="btn-primary text-xs shrink-0">Open the demo</button>}
+          </div>
+          <div className="rounded-lg border border-slate-700 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0"><p className="text-sm font-medium">Booking app (ShopOS Book)</p><p className="text-xs text-slate-400">{bk.open ? 'Open: customers can see business pages and book.' : 'Closed: booking pages show your notice and nobody can make a booking. Owners keep their data.'}</p></div>
+              <button role="switch" aria-checked={bk.open} aria-label="Booking app on or off" disabled={busy} onClick={() => { if (bk.open) { void (async () => { if (await askConfirm('Close the booking app for every business and customer now?')) void saveBookings(false); })(); } else void saveBookings(true); }} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${bk.open ? 'bg-emerald-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${bk.open ? 'translate-x-5' : ''}`} /></button>
+            </div>
+            {!bk.open && <>
+              <input className="input" maxLength={300} value={bk.message} onChange={(e) => setBk({ ...bk, message: e.target.value })} placeholder="Message customers see (optional)" />
+              <input className="input" type="datetime-local" value={bk.backAt} onChange={(e) => setBk({ ...bk, backAt: e.target.value })} aria-label="Back around" />
+              <button onClick={() => void saveBookings(false)} disabled={busy} className="btn-secondary text-xs">Save message</button>
+            </>}
           </div>
           {msg && <p className="text-sm text-slate-300" role="status">{msg}</p>}
           <div className="flex flex-wrap gap-2">

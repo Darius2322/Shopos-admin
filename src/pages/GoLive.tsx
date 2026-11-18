@@ -159,7 +159,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   const [sched, setSched] = useState<Sched[]>([]); const [schedAt, setSchedAt] = useState(''); const [schedNote, setSchedNote] = useState('');
   const [prevWeb, setPrevWeb] = useState<Br[]>([]);
   const [prevJob, setPrevJob] = useState<{ sha: string; url: string; state: 'starting' | 'building' | 'ready' | 'error'; msg?: string } | null>(null);
-  const [access, setAccess] = useState<boolean | null>(null); const [accessBusy, setAccessBusy] = useState(false);
+  const [access, setAccess] = useState<boolean | null>(null); const [accessBusy, setAccessBusy] = useState(false); const [capOn, setCapOn] = useState<boolean | null>(null);
   const [editId, setEditId] = useState<string | null>(null); const [editAt, setEditAt] = useState('');
   const [relTab, setRelTab] = useState<'now' | 'release' | 'schedule' | 'previous'>('now');
   const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
@@ -208,7 +208,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     void call({ action: 'history', repo: APP_REPO, app: 'web', n: 40 }).then((h) => setPrevWeb(h.error ? [] : ((h.commits ?? []) as Br[]).filter((c) => !c.build && (c.parents ?? 1) <= 2)));
     const t = window.setInterval(() => void loadSched(), 30000); return () => window.clearInterval(t);
   }, [sub, call, loadSched]);
-  useEffect(() => { if (sub !== 'release') return; void supabase.rpc('preview_is_public').then(({ data }) => setAccess(typeof data === 'boolean' ? data : null)); }, [sub, supabase]);
+  useEffect(() => { if (sub !== 'release') return; void supabase.rpc('preview_settings').then(({ data }) => { const d = data as { public?: boolean; captcha?: boolean } | null; setAccess(typeof d?.public === 'boolean' ? d.public : null); setCapOn(typeof d?.captcha === 'boolean' ? d.captcha : null); }); }, [sub, supabase]);
   useEffect(() => {
     if (!prevJob || prevJob.state !== 'building') return;
     let stop = false; let tries = 0; let timer = 0;
@@ -267,6 +267,12 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
     if (error || (data as Any)?.error) { fail('failed'); return; }
     setPrevJob(null); setDone(`Removed ${(data as Any).removed ?? 0} old copies.`);
   }
+  async function toggleCaptcha() {
+    if (capOn === null) return; const next = !capOn; setAccessBusy(true);
+    const { error } = await supabase.rpc('admin_set_preview_captcha', { p_on: next }); setAccessBusy(false);
+    if (error) { setErr('Could not change the setting.'); return; }
+    setCapOn(next); setDone(next ? 'Test copies show the human check, like the live site.' : 'Test copies hide the human check. Production is not affected.');
+  }
   async function toggleAccess() {
     if (access === null) return; const next = !access;
     if (next && !(await askConfirm('Turn on open access? Anyone who has the staging or old-version link will be able to open it with no password. Production is not affected.'))) return;
@@ -310,13 +316,26 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
         <p className="text-[11px] text-slate-500">Android apps: owner {metas.owner?.version ? `v${metas.owner.version}` : '—'} · booker {metas.booker?.version ? `v${metas.booker.version}` : '—'} · admin {metas.admin?.version ? `v${metas.admin.version}` : '—'}. The phone apps open the live website, so they always show what is running on production.</p>
       </Card>
   );
+  const Switch = ({ on, busy: bz, label, onClick }: { on: boolean | null; busy: boolean; label: string; onClick: () => void }) => (
+    <button role="switch" aria-checked={!!on} aria-label={label} disabled={on === null || bz} onClick={onClick} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-emerald-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${on ? 'translate-x-5' : ''}`} /></button>
+  );
   const renderAccess = () => (
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0"><div className="font-medium text-sm">Staging and preview access</div>
-            <p className="text-xs text-slate-400 mt-0.5">{access === null ? 'Checking…' : access ? 'On: anyone with the link can open staging and old versions, with no password or code. Production is never affected.' : 'Off: staging and old versions ask for an admin sign-in first.'}</p></div>
-          <button role="switch" aria-checked={!!access} aria-label="Staging and preview access" disabled={access === null || accessBusy} onClick={() => void toggleAccess()} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${access ? 'bg-emerald-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${access ? 'translate-x-5' : ''}`} /></button>
+      <Card className="p-4 space-y-4">
+        <div>
+          <div className="font-medium text-sm">What visitors meet on test copies</div>
+          <p className="text-xs text-slate-400 mt-0.5">Staging and old versions only. Production always has its full protection. Switch these to see the app exactly as a visitor, or as you.</p>
         </div>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 p-3">
+          <div className="min-w-0"><div className="font-medium text-sm">Open access (no password)</div>
+            <p className="text-xs text-slate-400 mt-0.5">{access === null ? 'Checking…' : access ? 'On: anyone with the staging link opens it straight away.' : 'Off: staging asks for the admin sign-in first.'}</p></div>
+          <Switch on={access} busy={accessBusy} label="Open access without password" onClick={() => void toggleAccess()} />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 p-3">
+          <div className="min-w-0"><div className="font-medium text-sm">Human check (captcha)</div>
+            <p className="text-xs text-slate-400 mt-0.5">{capOn === null ? 'Checking…' : capOn ? 'On: sign-in forms show the Cloudflare check, like the live site.' : 'Off: sign-in forms on test copies skip it.'}</p></div>
+          <Switch on={capOn} busy={accessBusy} label="Human check on test copies" onClick={() => void toggleCaptcha()} />
+        </div>
+        <p className="text-[11px] text-slate-500">Old-version links made with “Run” are always private: only your admin sign-in opens them, whatever the first switch says. If sign-in still asks for the check after you switch it off here, the check is also enforced in Supabase under Authentication, Attack Protection.</p>
       </Card>
   );
   const renderRelease = () => (
@@ -360,14 +379,14 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
         <div className="flex items-center justify-between gap-2"><div className="font-medium text-sm">Previous versions</div><button onClick={() => void cleanupPreviews()} className="btn-secondary text-xs">Remove old copies</button></div>
         {prevJob && <div className={`rounded-lg border p-3 text-xs space-y-1.5 ${prevJob.state === 'ready' ? 'border-emerald-600/60' : 'border-slate-600'}`} role="status">
           {(prevJob.state === 'starting' || prevJob.state === 'building') && <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Building a separate copy of version {prevJob.sha.slice(0, 7)}. This takes 1 to 2 minutes. You can leave this screen open.</div>}
-          {prevJob.state === 'ready' && <div className="flex items-center justify-between gap-2"><span>Version {prevJob.sha.slice(0, 7)} is ready on its own address. Production is untouched.</span><a href={prevJob.url} target="_blank" rel="noreferrer" className="btn-primary text-xs inline-flex items-center gap-1 shrink-0"><ExternalLink className="w-3 h-3" />Open it</a></div>}
+          {prevJob.state === 'ready' && <div className="flex items-center justify-between gap-2"><span>Version {prevJob.sha.slice(0, 7)} is ready on its own private address. Only your admin sign-in opens it. Production is untouched.</span><a href={prevJob.url} target="_blank" rel="noreferrer" className="btn-primary text-xs inline-flex items-center gap-1 shrink-0"><ExternalLink className="w-3 h-3" />Open it</a><button onClick={() => { void navigator.clipboard?.writeText(prevJob.url ?? ''); setDone('Link copied. It only opens for you.'); }} className="btn-secondary text-xs shrink-0">Copy link</button></div>}
           {prevJob.state === 'error' && <span className="text-red-400">{prevJob.msg ?? 'Something went wrong.'}</span>}
         </div>}
-        <p className="text-xs text-slate-400">“Run it” opens that version on its own address, so you can look at it and use it. Production is not touched. It uses the same shop data as production, so avoid saving new records while testing. “Move back” makes production that version again.</p>
+        <p className="text-xs text-slate-400">“Run” makes a link to that exact version. It opens that version on its own address, so you can look at it and use it. Production is not touched. It uses the same shop data as production, so avoid saving new records while testing. “Move back” makes production that version again.</p>
         {prevWeb.length === 0 ? <p className="text-xs text-slate-500">Loading…</p> : <ul className="text-sm divide-y divide-slate-700/60">{prevWeb.slice(0, 10).map((c, i) => (
           <li key={c.sha} className="py-2 flex items-center justify-between gap-2">
             <span className="min-w-0"><span className="block truncate">{c.message}</span><span className="block text-[11px] text-slate-500">{c.short} · {when(c.date)}{i === 0 ? ' · running now' : ''}</span></span>
-            <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={prevJob?.sha === c.sha && (prevJob.state === 'starting' || prevJob.state === 'building')} className="btn-secondary text-xs">{prevJob?.sha === c.sha && prevJob.state !== 'error' ? (prevJob.state === 'ready' ? 'Ready' : 'Building…') : 'Run it'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
+            <span className="flex gap-1.5 shrink-0"><button onClick={() => void openVersion(c)} disabled={prevJob?.sha === c.sha && (prevJob.state === 'starting' || prevJob.state === 'building')} className="btn-secondary text-xs">{prevJob?.sha === c.sha && prevJob.state !== 'error' ? (prevJob.state === 'ready' ? 'Ready' : 'Building…') : 'Run'}</button>{i > 0 && <button onClick={() => { setHistProd('website'); setSub('history'); }} className="btn-secondary text-xs">Move back</button>}</span>
           </li>))}</ul>}
       </Card>
   );

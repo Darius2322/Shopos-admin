@@ -3,7 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 type Row = { at: string; source: string; level: string; line: string };
 const COLOR: Record<string, string> = { ok: '#4ade80', info: '#7dd3fc', warn: '#fbbf24', err: '#f87171' };
-const SOURCES = ['all', 'sale', 'booking', 'review', 'signup', 'security', 'request', 'support'];
+const SOURCES = ['all', 'site', 'sale', 'booking', 'review', 'signup', 'security', 'request', 'support'];
 const stamp = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Africa/Nairobi', hour12: false });
 
 /** Everything happening on the platform, as it happens: sales, bookings, reviews, sign-ups, security events and requests. */
@@ -34,11 +34,12 @@ export default function LiveTerminal({ supabase }: { supabase: SupabaseClient })
       setRows(list);
       if (newKeys.size) { setFresh(newKeys); window.setTimeout(() => live && setFresh(new Set()), 2500); }
     }
-    void pull(); const t = window.setInterval(pull, 3000);
+    void pull(); const t = window.setInterval(pull, 2000);
     return () => { live = false; window.clearInterval(t); };
   }, [supabase, paused]);
 
   useEffect(() => { const el = box.current; if (el && stick.current) el.scrollTop = el.scrollHeight; }, [rows, src]);
+  const lastFive = rows.filter((r) => r.source === 'site' && Date.now() - new Date(r.at).getTime() < 5 * 60000).length;
   const shown = rows.filter((r) => src === 'all' || r.source === src);
 
   return (
@@ -46,11 +47,12 @@ export default function LiveTerminal({ supabase }: { supabase: SupabaseClient })
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2"><span className={`inline-block w-2.5 h-2.5 rounded-full ${paused ? 'bg-slate-400' : 'bg-green-500 animate-pulse'}`} />Live terminal</h1>
-          <p className="text-xs text-slate-500">Updates every 3 seconds. Showing the last 6 hours, Nairobi time.{last ? ` Last checked ${stamp(last.toISOString())}.` : ''}</p>
+          <p className="text-xs text-slate-500">Updates every 2 seconds. “site” lines are visitors on www.shopos.co.ke (page views, bots, devices, places). Showing the last 6 hours, Nairobi time.{last ? ` Last checked ${stamp(last.toISOString())}.` : ''}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setPaused((p) => !p)} className="px-3 py-1.5 rounded-lg border text-sm">{paused ? 'Resume' : 'Pause'}</button>
           <button onClick={() => { setRows([]); }} className="px-3 py-1.5 rounded-lg border text-sm">Clear screen</button>
+          <span className="px-3 py-1.5 rounded-lg border text-sm text-slate-500">{lastFive} site events in 5 min</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">

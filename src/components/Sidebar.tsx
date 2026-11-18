@@ -43,17 +43,20 @@ interface SidebarProps {
   badges: Badges;
 }
 
-/** The menu, in sub-categories. Each group has an icon and a number for what is new inside it. */
-const GROUPS: { id: string; label: string; icon: any; tabs: Tab[] }[] = [
+/** The menu: groups can hold pages or more groups, to any depth (menu, sub-menu, sub-sub-menu). */
+interface Group { id: string; label: string; icon: any; tabs: (Tab | Group)[] }
+const GROUPS: Group[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['dashboard', 'analytics'] },
-  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'bookings', 'branches', 'softdelete', 'businesstypes'] },
+  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
   { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
-  { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', 'database', 'assistant', 'live', 'monitor', 'audit', 'settings'] },
+  { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', { id: 'tools', label: 'Tools', icon: Terminal, tabs: ['database', 'assistant', { id: 'watch', label: 'Watching', icon: Radio, tabs: ['live', 'monitor', 'audit'] }] }, 'settings'] },
 ];
+const isGroup = (n: Tab | Group): n is Group => typeof n !== 'string';
+const flat = (g: Group): Tab[] => g.tabs.flatMap((n) => (isGroup(n) ? flat(n) : [n]));
 const label = (t: Tab) => TABS.find(([k]) => k === t)![1];
 const iconOf = (t: Tab) => TABS.find(([k]) => k === t)![2];
 
@@ -62,49 +65,42 @@ function NavList({ tab, onSelect, badges }: { tab: Tab; onSelect: (tab: Tab) => 
     try { return JSON.parse(localStorage.getItem('shopos-admin-groups') ?? '{}'); } catch { return {}; }
   });
   const [sound, setSound] = useState(soundOn());
-  const groups = GROUPS;
-  const activeGroup = groups.find((g) => g.tabs.includes(tab))?.id;
   useEffect(() => { try { localStorage.setItem('shopos-admin-groups', JSON.stringify(open)); } catch { /* ignore */ } }, [open]);
   // A group is open if you opened it, or if the page you are on lives inside it.
-  const isOpen = (id: string) => open[id] ?? (id === activeGroup);
+  const isOpen = (g: Group) => open[g.id] ?? flat(g).includes(tab);
+  const render = (g: Group, depth: number) => {
+    const GIcon = g.icon; const expanded = isOpen(g); const inside = flat(g).includes(tab);
+    return (
+      <div key={g.id}>
+        <button
+          onClick={() => setOpen({ ...open, [g.id]: !expanded })}
+          aria-expanded={expanded}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-card text-left hover:bg-slate-800 ${depth === 0 ? 'text-xs font-semibold uppercase tracking-wide' : 'text-sm font-medium'} ${inside ? 'text-ink' : 'text-slate-400'}`}
+        >
+          <GIcon className="w-4 h-4 shrink-0" /> <span className="flex-1 truncate">{g.label}</span>
+          {!expanded && <BadgeDot n={groupCount(badges, flat(g))} />}
+          <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+        </button>
+        {expanded && (
+          <div className="ml-3 pl-2 border-l border-slate-700 space-y-0.5 mt-0.5">
+            {g.tabs.map((n) => {
+              if (isGroup(n)) return render(n, depth + 1);
+              const Icon = iconOf(n);
+              return (
+                <button key={n} onClick={() => onSelect(n)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-card text-sm font-medium text-left ${tab === n ? 'bg-field-600 text-paper' : 'text-slate-400 hover:bg-slate-800 hover:text-ink'}`}>
+                  <Icon className="w-4 h-4 shrink-0" /> <span className="flex-1 truncate">{label(n)}</span><BadgeDot n={badgeFor(badges, n)} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-      {groups.map((g) => {
-        const GIcon = g.icon;
-        const n = groupCount(badges, g.tabs);
-        const expanded = isOpen(g.id);
-        return (
-          <div key={g.id}>
-            <button
-              onClick={() => setOpen({ ...open, [g.id]: !expanded })}
-              aria-expanded={expanded}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-card text-xs font-semibold uppercase tracking-wide text-left ${g.id === activeGroup ? 'text-ink' : 'text-slate-400'} hover:bg-slate-800`}
-            >
-              <GIcon className="w-4 h-4 shrink-0" /> <span className="flex-1 truncate">{g.label}</span>
-              {!expanded && <BadgeDot n={n} />}
-              <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} />
-            </button>
-            {expanded && (
-              <div className="ml-3 pl-2 border-l border-slate-700 space-y-0.5 mt-0.5">
-                {g.tabs.map((key) => {
-                  const Icon = iconOf(key);
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => onSelect(key)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-card text-sm font-medium text-left ${
-                        tab === key ? 'bg-field-600 text-paper' : 'text-slate-400 hover:bg-slate-800 hover:text-ink'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" /> <span className="flex-1 truncate">{label(key)}</span><BadgeDot n={badgeFor(badges, key)} />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {GROUPS.map((g) => render(g, 0))}
       <button
         onClick={() => { const next = !sound; setSound(next); setSoundOn(next); if (next) chime(); }}
         className="w-full flex items-center gap-2.5 px-3 py-2 mt-2 rounded-card text-xs text-slate-400 hover:bg-slate-800 text-left"
