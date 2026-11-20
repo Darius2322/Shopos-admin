@@ -195,7 +195,12 @@ export default function BookingAdmin({ supabase, view }: { supabase: SupabaseCli
           <Card key={o.business_id} className="p-3">
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-sm font-medium">{o.business_name}</div><div className="text-xs text-slate-500 break-all">{o.email ?? 'No owner account'}</div></div>
               <div className="text-right shrink-0"><div className="text-sm">{ago(o.last_sign_in_at)}</div><div className="text-[10px] text-slate-400">last sign-in</div></div></div>
-            <div className="text-xs text-slate-400 mt-2 flex flex-wrap gap-x-4">{o.last_sign_in_at && <span>{new Date(o.last_sign_in_at).toLocaleString('en-GB', { timeZone: TZ })}</span>}{o.account_created && <span>Account created {new Date(o.account_created).toLocaleDateString('en-GB')}</span>}<span>{o.has_shop ? 'Also has a ShopOS shop (same sign-in)' : 'Bookings only'}</span><span>{cnt[o.business_id] ?? 0} bookings</span></div>
+            <dl className="mt-3 pt-3 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+              <dt className="text-slate-400">Last signed in</dt><dd className="text-slate-600 dark:text-slate-300">{o.last_sign_in_at ? `${new Date(o.last_sign_in_at).toLocaleString('en-GB', { timeZone: TZ })} (${ago(o.last_sign_in_at)})` : 'Never signed in'}</dd>
+              <dt className="text-slate-400">Account created</dt><dd className="text-slate-600 dark:text-slate-300">{o.account_created ? new Date(o.account_created).toLocaleString('en-GB', { timeZone: TZ }) : 'Unknown'}</dd>
+              <dt className="text-slate-400">Account type</dt><dd className="text-slate-600 dark:text-slate-300">{o.has_shop ? 'Also has a ShopOS shop (same sign-in)' : 'Bookings only'}</dd>
+              <dt className="text-slate-400">Bookings received</dt><dd className="text-slate-600 dark:text-slate-300">{cnt[o.business_id] ?? 0}</dd>
+            </dl>
           </Card>))}
       </div>
     );
