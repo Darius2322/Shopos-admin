@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Radio, CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
+import { Clock, Radio, CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live';
+export type Tab = 'lastseen' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
   ['requests', 'Owner Requests', Users],
   ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
+  ['lastseen', 'Last seen', Clock],
   ['bookings', 'Bookings', CalendarCheck],
   ['mpesa', 'M-Pesa', Wallet],
   ['packages', 'Packages', Package],
@@ -47,7 +48,7 @@ interface SidebarProps {
 interface Group { id: string; label: string; icon: any; tabs: (Tab | Group)[] }
 const GROUPS: Group[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['dashboard', 'analytics'] },
-  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
+  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'lastseen', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
