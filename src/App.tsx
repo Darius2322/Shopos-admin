@@ -38,6 +38,7 @@ import PlatformSettingsPage from './pages/PlatformSettings';
 import RoleDefaultsPage from './pages/RoleDefaults';
 import Reviews from './pages/Reviews';
 import LastSeen from './pages/LastSeen';
+import Status from './pages/Status';
 import Analytics from './pages/Analytics';
 import AppsAndUpdates from './pages/AppsAndUpdates';
 import Monitor from './pages/Monitor';
@@ -144,7 +145,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'M-Pesa', assistant: 'Assistant', golive: 'Go live', website: 'Website', live: 'Live terminal', notifications: 'Notifications',
-  lastseen: 'Last seen', dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
+  statusup: 'Status: Uptime', statuslog: 'Status: Downtime log', statuspage: 'Status: Public page', lastseen: 'Last seen', dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
   bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
@@ -233,6 +234,9 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'branches' && <Branches supabase={supabase} onOpenBusiness={openBusiness} />}
             {tab === 'features' && <FeatureRequests supabase={supabase} />}
             {tab === 'lastseen' && <LastSeen supabase={supabase} />}
+            {tab === 'statusup' && <Status supabase={supabase} view="uptime" />}
+            {tab === 'statuslog' && <Status supabase={supabase} view="log" />}
+            {tab === 'statuspage' && <Status supabase={supabase} view="page" />}
             {tab === 'reviews' && <Merged id="reviews" preferBooking={badges.bk_hide_requests > 0 && badges.reviews === 0} shop={<Reviews supabase={supabase} />} booking={[{ id: 'bkrev', label: 'Booking reviews', node: <BookingAdmin supabase={supabase} view="reviews" /> }]} />}
             {tab === 'audit' && <AuditLogs supabase={supabase} />}
             {tab === 'support' && <Support supabase={supabase} />}

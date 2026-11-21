@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Clock, Radio, CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe } from 'lucide-react';
+import { Clock, Radio, CalendarCheck, ChevronDown, Bell, BellOff, Headphones, Briefcase, Cpu, LayoutDashboard, Users, Building2, Store, ScrollText, LifeBuoy, LogOut, Settings, X, Sparkles, ShieldCheck, Star, RefreshCw, BarChart3, Terminal, Database, Wallet, Bot, Trash2, Package, Palette, Rocket, Globe, Activity } from 'lucide-react';
 
 import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges } from '../lib/badges';
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'lastseen' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live';
+export type Tab = 'lastseen' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live' | 'statusup' | 'statuslog' | 'statuspage';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -13,6 +13,9 @@ export const TABS: [Tab, string, any][] = [
   ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
   ['lastseen', 'Last seen', Clock],
+  ['statusup', 'Uptime', Activity],
+  ['statuslog', 'Downtime log', ScrollText],
+  ['statuspage', 'Public status page', Globe],
   ['bookings', 'Bookings', CalendarCheck],
   ['mpesa', 'M-Pesa', Wallet],
   ['packages', 'Packages', Package],
@@ -52,6 +55,7 @@ const GROUPS: Group[] = [
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
+  { id: 'status', label: 'Status', icon: Activity, tabs: ['statusup', 'statuslog', 'statuspage'] },
   { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', { id: 'tools', label: 'Tools', icon: Terminal, tabs: ['database', 'assistant', { id: 'watch', label: 'Watching', icon: Radio, tabs: ['live', 'monitor', 'audit'] }] }, 'settings'] },

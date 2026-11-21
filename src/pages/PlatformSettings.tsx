@@ -231,7 +231,7 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
     const open = !nextClosed && nextParts.length === 0;
     // Once everything is open the old message and time are cleared, so the next closing starts clean.
     setApp({ closed: nextClosed, parts: nextParts, message: open ? '' : app.message, backAt: open ? '' : app.backAt });
-    setMsg(nextClosed ? 'The whole app is now closed for everyone.' : nextParts.length ? 'Saved. The ticked parts are closed.' : 'Saved. The app is open.');
+    setMsg(nextClosed ? 'The whole app is now closed for everyone.' : nextParts.length ? 'Saved. The parts switched to Closed are now closed.' : 'Saved. The app is open.');
     void load();
   }
   async function saveBiz(closed: boolean, parts: string[]) {
@@ -277,10 +277,17 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
   if (!loaded) return null;
 
   const PartList = ({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) => (
-    <div className="grid sm:grid-cols-2 gap-x-4">
-      {PARTS.map(([k, label]) => (
-        <label key={k} className="flex items-center gap-2 py-1 text-sm cursor-pointer"><input type="checkbox" checked={value.includes(k)} onChange={(e) => onChange(e.target.checked ? [...value, k] : value.filter((x) => x !== k))} /> {label}</label>
-      ))}
+    <div className="grid sm:grid-cols-2 gap-x-6">
+      {PARTS.map(([k, label]) => {
+        const closed = value.includes(k);
+        return (
+          <div key={k} className="flex items-center justify-between gap-3 py-2 border-b border-slate-800/60">
+            <span className="text-sm">{label}<span className={`block text-[11px] ${closed ? 'text-amber-500' : 'text-slate-500'}`}>{closed ? 'Closed' : 'Open'}</span></span>
+            <button role="switch" aria-checked={closed} aria-label={`${label}: ${closed ? 'closed' : 'open'}`} onClick={() => onChange(closed ? value.filter((x) => x !== k) : [...value, k])}
+              className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${closed ? 'bg-amber-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${closed ? 'translate-x-5' : ''}`} /></button>
+          </div>
+        );
+      })}
     </div>
   );
   const tabs: ['app' | 'business' | 'history', string][] = [['app', 'Whole app'], ['business', `A business${ov.businesses.length ? ` (${ov.businesses.length})` : ''}`], ['history', 'History']];
@@ -341,7 +348,7 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
               </select>
             </label>
             {bizId && (<>
-              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={wholeBiz} onChange={(e) => setWholeBiz(e.target.checked)} /> Close the whole business</label>
+              <div className="flex items-center justify-between gap-3 py-1"><span className="text-sm">Close the whole business<span className={`block text-[11px] ${wholeBiz ? 'text-amber-500' : 'text-slate-500'}`}>{wholeBiz ? 'Closed' : 'Open'}</span></span><button role="switch" aria-checked={wholeBiz} aria-label="Close the whole business" onClick={() => setWholeBiz(!wholeBiz)} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${wholeBiz ? 'bg-amber-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${wholeBiz ? 'translate-x-5' : ''}`} /></button></div>
               {!wholeBiz && <div><p className="text-xs text-slate-400 mb-1">Or close only these parts, for this business</p><PartList value={bParts} onChange={setBParts} /></div>}
               <label className="block"><span className="block text-xs text-slate-400 mb-1">Message to this business (optional)</span><input className="input" maxLength={300} value={bMsg} onChange={(e) => setBMsg(e.target.value)} placeholder="We are fixing something on your account." /></label>
               <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={bBack} onChange={(e) => setBBack(e.target.value)} /></label>
