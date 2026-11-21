@@ -26,6 +26,63 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 }
 const Lbl = ({ t, children }: { t: string; children: React.ReactNode }) => <label className="block"><span className="block text-xs text-slate-400 mb-1">{t}</span>{children}</label>;
 
+/** ShopOS's own PayHero channel: package payments from every business land here. Keys are sealed on the server and never shown again. */
+function PlatformPayHero({ supabase }: { supabase: SupabaseClient }) {
+  const [st, setSt] = useState<{ enabled: boolean; configured: boolean; channelId: number | null; updatedAt: string | null } | null>(null);
+  const [apiUser, setApiUser] = useState('');
+  const [apiPass, setApiPass] = useState('');
+  const [channel, setChannel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  async function call(body: Record<string, unknown>) {
+    const { data, error } = await supabase.functions.invoke('payhero', { body });
+    if (error) {
+      try { const j = await (error as { context?: Response }).context?.json(); if (j?.error) return { ok: false, error: String(j.error) } as { ok: boolean; error?: string; [k: string]: unknown }; } catch { /* ignore */ }
+      return { ok: false, error: 'Something went wrong. Please try again.' } as { ok: boolean; error?: string; [k: string]: unknown };
+    }
+    return data as { ok: boolean; error?: string; [k: string]: unknown };
+  }
+  async function load() {
+    const r = await call({ action: 'platform_status' });
+    if (r.ok) setSt({ enabled: !!r.enabled, configured: !!r.configured, channelId: (r.channelId as number) ?? null, updatedAt: (r.updatedAt as string) ?? null });
+    else setErr(r.error ?? 'Could not load.');
+  }
+  useEffect(() => { void load(); }, []);
+  async function save(enable?: boolean) {
+    setErr(null); setMsg(null); setBusy(true);
+    const body: Record<string, unknown> = { action: 'platform_save' };
+    if (apiUser.trim()) body.apiUser = apiUser.trim();
+    if (apiPass.trim()) body.apiPassword = apiPass.trim();
+    if (channel.trim()) body.channelId = Number(channel);
+    if (typeof enable === 'boolean') body.enabled = enable;
+    const r = await call(body);
+    setBusy(false);
+    if (!r.ok) { setErr(r.error ?? 'Could not save.'); return; }
+    setApiUser(''); setApiPass(''); setChannel('');
+    setMsg(enable === true ? 'Package payments now go through PayHero.' : enable === false ? 'PayHero is off. Packages use the normal M-Pesa number.' : 'Saved.');
+    void load();
+  }
+  if (!st) return <Skeleton />;
+  return (
+    <Card className="p-4 space-y-3 max-w-lg">
+      <p className="font-medium">ShopOS PayHero channel</p>
+      <p className="text-xs text-slate-400">Package payments from every business are paid into this PayHero account. Each business uses its own PayHero account for its customers. {st.configured ? `Keys saved, channel ${st.channelId}.` : 'Not set up yet.'} Status: {st.enabled ? 'ON' : 'off'}.</p>
+      <Lbl t="API username"><input className="input" value={apiUser} onChange={(e) => setApiUser(e.target.value)} autoComplete="off" spellCheck={false} /></Lbl>
+      <Lbl t="API password"><input className="input" type="password" value={apiPass} onChange={(e) => setApiPass(e.target.value)} autoComplete="new-password" /></Lbl>
+      <Lbl t="Channel number"><input className="input" inputMode="numeric" value={channel} onChange={(e) => setChannel(e.target.value.replace(/\D/g, ''))} /></Lbl>
+      {err && <p className="text-sm text-rust-600">{err}</p>}
+      {msg && <p className="text-sm text-field-700">{msg}</p>}
+      <div className="flex gap-2 flex-wrap">
+        <button className="btn-secondary" disabled={busy || !(apiUser || apiPass || channel)} onClick={() => save()}>{busy ? 'Working…' : 'Save keys'}</button>
+        {!st.enabled
+          ? <button className="btn-primary" disabled={busy || (!st.configured && !(apiUser && apiPass && channel))} onClick={() => save(true)}>Check keys and turn on</button>
+          : <button className="btn-secondary" disabled={busy} onClick={() => save(false)}>Turn off</button>}
+      </div>
+    </Card>
+  );
+}
+
 /** M-Pesa for the whole platform: connect each business's own number, turn on automatic refunds, and set ShopOS's own number for package payments. */
 export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -36,7 +93,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   const [payoutFor, setPayoutFor] = useState<Row | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [sub, setSub] = useState<'businesses' | 'keys' | 'number' | 'packages'>('businesses');
+  const [sub, setSub] = useState<'businesses' | 'keys' | 'number' | 'packages' | 'payhero'>('businesses');
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_mpesa_list');
@@ -79,13 +136,14 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
       {msg && <p className="text-sm text-field-600" role="status">{msg}</p>}
 
       <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-700 -mx-1 px-1">
-        {([['businesses', `Businesses${waiting.length ? ` (${waiting.length})` : ''}`], ['keys', 'Shared keys'], ['number', 'ShopOS number'], ['packages', 'Package payments']] as const).map(([k, l]) => (
+        {([['businesses', `Businesses${waiting.length ? ` (${waiting.length})` : ''}`], ['keys', 'Shared keys'], ['number', 'ShopOS number'], ['payhero', 'PayHero'], ['packages', 'Package payments']] as const).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px ${sub === k ? 'border-field-600 text-ink' : 'border-transparent text-slate-400 hover:text-ink'}`}>{l}</button>
         ))}
       </div>
 
       {sub === 'keys' && <SharedKeys />}
       {sub === 'number' && <PlatformNumber />}
+      {sub === 'payhero' && <PlatformPayHero supabase={supabase} />}
 
       {sub === 'businesses' && <div className="space-y-2">
         <h3 className="font-medium text-sm">Businesses{waiting.length > 0 ? ` · ${waiting.length} waiting` : ''}</h3>
