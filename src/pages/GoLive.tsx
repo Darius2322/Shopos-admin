@@ -24,6 +24,55 @@ interface LogRow { id: string; at: string; app: string; action: string; from_sha
 type Sub = 'overview' | 'analytics' | 'release' | 'history' | 'apps' | 'safety' | 'preview' | 'links' | 'activity';
 type Any = Record<string, any>;
 
+interface ChFile { name: string; status: string; add: number; del: number }
+interface ChCommit { sha: string; short: string; message: string; body: string; date?: string; author?: string; url?: string; additions: number | null; deletions: number | null; files: ChFile[] }
+const FILE_COLOR: Record<string, string> = { added: 'text-emerald-400', removed: 'text-rose-400', modified: 'text-amber-400', renamed: 'text-sky-400' };
+
+/** What is waiting on staging, change by change. Tap a change to see its full note and the files it touches. */
+function ChangesPanel({ call, repo, onClose }: { call: (b: Any) => Promise<Any>; repo: string; onClose: () => void }) {
+  const [data, setData] = useState<{ ahead: number; compareUrl: string | null; totalFiles: number; commits: ChCommit[] } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => {
+    let off = false;
+    void call({ action: 'changes', repo }).then((r) => { if (off) return; if (r?.error) setErr('Could not load the changes. Try again in a moment.'); else { setData(r as never); setOpen((r as { commits?: ChCommit[] }).commits?.[0]?.sha ?? null); } }).catch(() => { if (!off) setErr('Could not load the changes.'); });
+    return () => { off = true; };
+  }, []);
+  return (
+    <div className="rounded-lg border border-slate-700 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{data ? `${data.ahead} change${data.ahead === 1 ? '' : 's'} not on production yet` : 'Changes waiting on staging'}{data && data.totalFiles ? <span className="text-xs text-slate-400 font-normal"> · {data.totalFiles} file{data.totalFiles === 1 ? '' : 's'} in all</span> : null}</p>
+        <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-200">Close</button>
+      </div>
+      {err && <p className="text-xs text-rose-400">{err}</p>}
+      {!data && !err && <p className="text-xs text-slate-400">Loading…</p>}
+      {data && (
+        <ul className="divide-y divide-slate-800">
+          {data.commits.map((c) => {
+            const isOpen = open === c.sha;
+            return (
+              <li key={c.sha} className="py-2">
+                <button className="w-full text-left" onClick={() => setOpen(isOpen ? null : c.sha)} aria-expanded={isOpen}>
+                  <p className="text-sm">{c.message}</p>
+                  <p className="text-[11px] text-slate-400">{c.short} · {when(c.date)}{c.author ? ` · ${c.author}` : ''}{c.additions !== null ? ` · +${c.additions} −${c.deletions}` : ''} · {isOpen ? 'hide details' : 'show details'}</p>
+                </button>
+                {isOpen && (
+                  <div className="mt-2 space-y-2">
+                    {c.body && <p className="text-xs text-slate-300 whitespace-pre-wrap">{c.body}</p>}
+                    {c.files.length > 0 && <ul className="text-[11px] space-y-0.5 max-h-48 overflow-y-auto">{c.files.map((f) => <li key={f.name} className="flex justify-between gap-2"><span className="truncate"><span className={FILE_COLOR[f.status] ?? 'text-slate-400'}>{f.status}</span> {f.name}</span><span className="text-slate-500 shrink-0">+{f.add} −{f.del}</span></li>)}</ul>}
+                    {c.url && <a href={c.url} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">See the full change on GitHub <ExternalLink className="w-3 h-3" /></a>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {data?.compareUrl && <a href={data.compareUrl} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">Compare staging with production on GitHub <ExternalLink className="w-3 h-3" /></a>}
+    </div>
+  );
+}
+
 const ERR: Record<string, string> = {
   token_missing: 'GitHub is not connected yet. In Supabase → Edge Functions → Secrets add GITHUB_TOKEN (a GitHub token with write access: Contents and Actions).',
   token_invalid: 'The GitHub token was refused. Make a new one and replace GITHUB_TOKEN in Supabase.',
@@ -147,6 +196,7 @@ function DataSafetyPanel({ supabase }: { supabase: SupabaseClient }) {
 export default function GoLive({ supabase, onGoNotifications }: { supabase: SupabaseClient; onGoNotifications?: () => void }) {
   const [sub, setSub] = useState<Sub>('overview');
   const [previewStart, setPreviewStart] = useState('website');
+  const [changesFor, setChangesFor] = useState<string | null>(null);
   const [histProd, setHistProd] = useState<'website' | 'owner' | 'booker' | 'admin'>('website');
   const histApp: 'web' | 'admin' = histProd === 'admin' ? 'admin' : 'web';
   const [web, setWeb] = useState<St | null>(null); const [adm, setAdm] = useState<St | null>(null);
@@ -458,8 +508,9 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
               <div className="rounded-lg border border-field-500/30 p-2.5 space-y-0.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] text-field-500 font-medium">PRODUCTION · live now</span>{st && <Pill ok text={`Live for ${span(st.liveSince, now)}`} />}</div>
                 <div className="text-sm">{live?.message ?? '—'}</div><div className="text-xs text-slate-500">{live?.short ?? ''}{live?.short ? ' · ' : ''}since {when(st?.liveSince)} · last update {when(live?.date)}</div></div>
               <div className="rounded-lg border border-amber-500/30 p-2.5 space-y-0.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] text-amber-500 font-medium">STAGING · being tested</span>
-                {isAdmin ? <span className="text-xs text-slate-500">No staging copy</span> : web && (web.ahead > 0 ? <Pill ok={false} text={`${web.ahead} change${web.ahead === 1 ? '' : 's'} ahead`} /> : <Pill ok text="Same as production" />)}</div>
+                {isAdmin ? <span className="text-xs text-slate-500">No staging copy</span> : web && (web.ahead > 0 ? <button onClick={() => setChangesFor(changesFor === d.id ? null : d.id)} aria-expanded={changesFor === d.id} aria-label="See the changes waiting on staging" className="rounded-full ring-1 ring-transparent hover:ring-rust-500/60"><Pill ok={false} text={`${web.ahead} change${web.ahead === 1 ? '' : 's'} ahead · details`} /></button> : <Pill ok text="Same as production" />)}</div>
                 {isAdmin ? <div className="text-xs text-slate-500">Changes go live as soon as they are pushed to GitHub.</div> : <><div className="text-sm">{web?.staging?.message ?? '—'}</div><div className="text-xs text-slate-500">{web?.staging?.short ?? ''}{web?.staging?.short ? ' · ' : ''}{when(web?.staging?.date)}</div></>}</div>
+              {!isAdmin && changesFor === d.id && <ChangesPanel call={call} repo={web?.repo ?? 'Darius2322/shopos-app'} onClose={() => setChangesFor(null)} />}
               <div className="flex flex-wrap gap-2 text-xs">
                 {!isAdmin && <button onClick={() => void releaseOne('web')} disabled={busy || !web || web.ahead === 0} className="btn-primary text-xs inline-flex items-center gap-1 disabled:!bg-slate-700 disabled:!text-slate-400 disabled:opacity-100"><Rocket className="w-3 h-3" />{web && web.ahead === 0 ? 'Nothing to release' : 'Release to production'}</button>}
                 <button onClick={() => { setHistProd(d.id); setSub('history'); }} className="btn-secondary text-xs inline-flex items-center gap-1"><Undo2 className="w-3 h-3" />Move back</button>

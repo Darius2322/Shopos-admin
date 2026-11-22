@@ -9,7 +9,7 @@ interface Day { d: string; up: number | null; n: number }
 interface Hour { h: string; ms: number | null; up: number | null }
 interface Comp { key: string; label: string; state: 'up' | 'down' | 'unknown'; uptime30: number | null; uptime7: number | null; days: Day[]; hours: Hour[] }
 interface Incident { key: string; label: string; start: string; last: string; checks: number }
-interface Overview { enabled: boolean; message: string | null; components: Comp[]; incidents: Incident[]; at: string }
+interface Overview { incident_map?: Record<string, { start: string; last: string; n: number }[]>; enabled: boolean; message: string | null; components: Comp[]; incidents: Incident[]; at: string }
 
 const dayColor = (up: number | null) => up === null ? 'bg-slate-700' : up >= 99.9 ? 'bg-emerald-500' : up >= 98 ? 'bg-amber-500' : 'bg-rose-500';
 const fmtDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString([], { day: 'numeric', month: 'short' });
@@ -27,6 +27,35 @@ function HoursChart({ hours }: { hours: Hour[] }) {
       {segs.map((s, i) => <polyline key={i} points={s} fill="none" strokeWidth="2" stroke="currentColor" className="text-emerald-400" vectorEffect="non-scaling-stroke" />)}
       {hours.map((h, i) => h.up !== null && h.up < 100 ? <circle key={i} cx={pts[i].x} cy={pts[i].y as number} r="3" className="fill-rose-500" /> : null)}
     </svg>
+  );
+}
+
+interface Inc { start: string; last: string; n: number }
+const incLen = (n: number) => { const m = n * 5; return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const fmtTime = (t: string) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const fmtLong = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+
+/** 30 day bars. Tap a day to see what happened: uptime, checks, and each outage with when it started and how long it lasted. */
+function UptimeBars({ days, incidents }: { days: Day[]; incidents?: Inc[] }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const day = days.find((d) => d.d === sel);
+  const list = (incidents ?? []).filter((i) => i.start.slice(0, 10) === sel);
+  return (
+    <div>
+      <div className="flex gap-[3px] h-9 items-stretch" aria-label="Daily uptime for the last 30 days">
+        {days.map((d) => (
+          <button key={d.d} type="button" onClick={() => setSel(sel === d.d ? null : d.d)} aria-pressed={sel === d.d} aria-label={`${fmtDay(d.d)}: ${d.up === null ? 'no data' : d.up + '% up'}. Tap for details`} title={`${fmtDay(d.d)}: ${d.up === null ? 'no data' : d.up + '% up'}`} className={`flex-1 rounded-sm ${dayColor(d.up)} ${sel === d.d ? 'ring-2 ring-offset-1 ring-slate-500' : ''}`} />
+        ))}
+      </div>
+      {day && (
+        <div className="rounded-lg border border-slate-700 p-3 mt-2 text-sm space-y-1">
+          <div className="flex justify-between gap-2"><p className="font-medium">{fmtLong(day.d)}</p><button type="button" className="text-xs text-slate-400" onClick={() => setSel(null)}>Close</button></div>
+          <p className="text-xs text-slate-400">{day.up === null ? 'No checks were recorded this day.' : `${day.up}% up · ${day.n} check${day.n === 1 ? '' : 's'}`}</p>
+          {day.up !== null && list.length === 0 && <p className="text-xs">{day.up >= 99.9 ? 'No downtime.' : 'Some checks failed, but no full outage was logged.'}</p>}
+          {list.map((i) => <p key={i.start} className="text-xs">Down from {fmtTime(i.start)}{i.n > 1 ? ` to ${fmtTime(i.last)}` : ''} · about {incLen(i.n)}</p>)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -133,9 +162,7 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
                 <p className="font-medium inline-flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${dot}`} />{c.label}</p>
                 <p className={`text-sm ${tcls}`}>{text}</p>
               </div>
-              <div className="flex gap-[3px] h-9 items-stretch" role="img" aria-label="Daily uptime, last 30 days">
-                {c.days.map((d) => <div key={d.d} title={`${fmtDay(d.d)}: ${d.up === null ? 'no data' : d.up + '% up'}`} className={`flex-1 rounded-sm ${dayColor(d.up)}`} />)}
-              </div>
+              <UptimeBars days={c.days} incidents={o.incident_map?.[c.key]} />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1 mb-3"><span>30 days ago</span><span>{c.uptime30 === null ? 'No data yet' : `${c.uptime30}% uptime (30 days)`}</span><span>Today</span></div>
               <p className="text-[11px] text-slate-400 mb-1">Last 48 hours{c.uptime7 !== null ? ` · ${c.uptime7}% over 7 days` : ''}</p>
               <HoursChart hours={c.hours} />

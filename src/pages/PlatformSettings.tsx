@@ -177,6 +177,79 @@ function PublicFiguresCard({ supabase }: { supabase: SupabaseClient }) {
   );
 }
 
+interface SchedRow { id: string; action: 'close' | 'open'; whole: boolean; parts: string[]; run_at: string; message: string | null; back_at: string | null; status: 'pending' | 'done' | 'cancelled'; done_at: string | null }
+
+/** Plan a closing or opening for a chosen time. The database applies it automatically within a minute of that time. */
+function ScheduleTab({ supabase, PartList }: { supabase: SupabaseClient; PartList: (p: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) => JSX.Element }) {
+  const [rows, setRows] = useState<SchedRow[] | null>(null);
+  const [action, setAction] = useState<'close' | 'open'>('close');
+  const [whole, setWhole] = useState(false);
+  const [parts, setParts] = useState<string[]>([]);
+  const [at, setAt] = useState('');
+  const [msg, setMsg] = useState('');
+  const [back, setBack] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  async function load() {
+    const { data } = await supabase.rpc('admin_maint_schedule_list');
+    setRows((data ?? []) as SchedRow[]);
+  }
+  useEffect(() => { void load(); const t = setInterval(() => void load(), 30_000); return () => clearInterval(t); }, []);
+  async function add() {
+    setNote(null);
+    if (!at) { setNote('Pick the date and time.'); return; }
+    if (!whole && parts.length === 0) { setNote('Switch on the whole app or at least one part.'); return; }
+    setBusy(true);
+    const { error } = await supabase.rpc('admin_maint_schedule_add', { p_action: action, p_whole: whole, p_parts: parts, p_run_at: new Date(at).toISOString(), p_message: action === 'close' ? msg : '', p_back_at: action === 'close' && back ? new Date(back).toISOString() : null });
+    setBusy(false);
+    if (error) { setNote(error.message.includes('future') ? 'Pick a time in the future.' : 'Could not schedule that. Please try again.'); return; }
+    setNote('Scheduled. It will apply by itself at that time.'); setWhole(false); setParts([]); setAt(''); setMsg(''); setBack(''); void load();
+  }
+  async function cancel(id: string) {
+    if (!(await askConfirm('Cancel this scheduled change?'))) return;
+    await supabase.rpc('admin_maint_schedule_cancel', { p_id: id }); void load();
+  }
+  const label = (r: SchedRow) => `${r.action === 'close' ? 'Close' : 'Open'} ${r.whole ? 'the whole app' : r.parts.map((k) => PARTS.find(([x]) => x === k)?.[1] ?? k).join(', ')}`;
+  const pending = (rows ?? []).filter((r) => r.status === 'pending').sort((a, b) => a.run_at.localeCompare(b.run_at));
+  const past = (rows ?? []).filter((r) => r.status !== 'pending').slice(0, 10);
+  return (
+    <div className="space-y-3">
+      <Card className="space-y-3">
+        <p className="font-medium text-sm">Schedule a change</p>
+        <div className="flex gap-2">
+          {(['close', 'open'] as const).map((k) => <button key={k} onClick={() => setAction(k)} className={`px-4 py-1.5 rounded-lg text-sm border ${action === k ? 'bg-field-600 border-field-600 text-paper' : 'border-slate-600 text-slate-400'}`}>{k === 'close' ? 'Close' : 'Open'}</button>)}
+        </div>
+        <div className="flex items-center justify-between gap-3 py-1 border-b border-slate-800/60">
+          <span className="text-sm">The whole app<span className="block text-[11px] text-slate-500">{action === 'close' ? 'Closes everything for everyone.' : 'Opens everything again, including all closed parts.'}</span></span>
+          <button role="switch" aria-checked={whole} aria-label="The whole app" onClick={() => setWhole(!whole)} className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${whole ? 'bg-amber-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${whole ? 'translate-x-5' : ''}`} /></button>
+        </div>
+        {!whole && <div><p className="text-xs text-slate-400 mb-1">Or only these parts (switch on the ones to {action})</p><PartList value={parts} onChange={setParts} /></div>}
+        <label className="block"><span className="block text-xs text-slate-400 mb-1">When</span><input className="input" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} /></label>
+        {action === 'close' && <>
+          <label className="block"><span className="block text-xs text-slate-400 mb-1">Message shown to shops (optional)</span><input className="input" maxLength={300} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="We are updating ShopOS. Back shortly." /></label>
+          <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={back} onChange={(e) => setBack(e.target.value)} /></label>
+        </>}
+        {note && <p className="text-sm text-slate-300" role="status">{note}</p>}
+        <button onClick={() => void add()} disabled={busy} className="btn-primary text-sm">{busy ? 'Scheduling…' : 'Schedule it'}</button>
+      </Card>
+      <Card className="space-y-2">
+        <p className="font-medium text-sm">Coming up</p>
+        {rows === null ? <Skeleton /> : pending.length === 0 ? <p className="text-xs text-slate-400">Nothing is scheduled.</p> : (
+          <ul className="divide-y divide-slate-800">{pending.map((r) => (
+            <li key={r.id} className="py-2 flex items-center justify-between gap-3 text-sm">
+              <div><p>{label(r)}</p><p className="text-xs text-slate-400">{new Date(r.run_at).toLocaleString()}{r.message ? ` · "${r.message}"` : ''}</p></div>
+              <button onClick={() => void cancel(r.id)} className="btn-secondary text-xs shrink-0">Cancel</button>
+            </li>))}</ul>
+        )}
+      </Card>
+      {past.length > 0 && <Card className="space-y-2">
+        <p className="font-medium text-sm">Done or cancelled</p>
+        <ul className="divide-y divide-slate-800">{past.map((r) => <li key={r.id} className="py-2 text-sm flex items-center justify-between gap-3"><span>{label(r)}</span><span className={`text-xs ${r.status === 'done' ? 'text-emerald-400' : 'text-slate-500'}`}>{r.status === 'done' ? 'Done' : 'Cancelled'} · {new Date(r.done_at ?? r.run_at).toLocaleString()}</span></li>)}</ul>
+      </Card>}
+    </div>
+  );
+}
+
 const PARTS: [string, string][] = [
   ['sales', 'Selling (POS and sales)'], ['payments', 'M-Pesa and payments'], ['reports', 'Reports and analytics'], ['stock', 'Stock and products'],
   ['packages', 'Packages and plans'], ['customers', 'Customers and debts'], ['documents', 'Quotations and invoices'], ['suppliers', 'Suppliers and expenses'],
@@ -193,7 +266,7 @@ interface Overview { businesses: BizRow[]; history: HistRow[] }
 
 /** Close the main app, or one business, or parts of either, for maintenance. Shops see a calm notice; nothing is lost. */
 function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
-  const [tab, setTab] = useState<'app' | 'business' | 'history'>('app');
+  const [tab, setTab] = useState<'app' | 'business' | 'schedule' | 'history'>('app');
   const [ov, setOv] = useState<Overview>({ businesses: [], history: [] });
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [demoOpen, setDemoOpen] = useState(true);
@@ -276,21 +349,21 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
   }
   if (!loaded) return null;
 
-  const PartList = ({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) => (
+  const PartList = ({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) => (
     <div className="grid sm:grid-cols-2 gap-x-6">
       {PARTS.map(([k, label]) => {
         const closed = value.includes(k);
         return (
           <div key={k} className="flex items-center justify-between gap-3 py-2 border-b border-slate-800/60">
             <span className="text-sm">{label}<span className={`block text-[11px] ${closed ? 'text-amber-500' : 'text-slate-500'}`}>{closed ? 'Closed' : 'Open'}</span></span>
-            <button role="switch" aria-checked={closed} aria-label={`${label}: ${closed ? 'closed' : 'open'}`} onClick={() => onChange(closed ? value.filter((x) => x !== k) : [...value, k])}
-              className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${closed ? 'bg-amber-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${closed ? 'translate-x-5' : ''}`} /></button>
+            <button role="switch" aria-checked={closed} disabled={disabled} aria-label={`${label}: ${closed ? 'closed' : 'open'}`} onClick={() => onChange(closed ? value.filter((x) => x !== k) : [...value, k])}
+              className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${closed ? 'bg-amber-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${closed ? 'translate-x-5' : ''}`} /></button>
           </div>
         );
       })}
     </div>
   );
-  const tabs: ['app' | 'business' | 'history', string][] = [['app', 'Whole app'], ['business', `A business${ov.businesses.length ? ` (${ov.businesses.length})` : ''}`], ['history', 'History']];
+  const tabs: ['app' | 'business' | 'schedule' | 'history', string][] = [['app', 'Whole app'], ['business', `A business${ov.businesses.length ? ` (${ov.businesses.length})` : ''}`], ['schedule', 'Schedule'], ['history', 'History']];
 
   return (
     <div>
@@ -306,10 +379,11 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
         <Card className="space-y-3">
           <div className={`rounded-lg p-3 text-sm ${app.closed ? 'bg-rust-500/15 text-rust-500' : app.parts.length ? 'bg-amber-500/15 text-amber-500' : 'bg-field-600/15 text-field-600'}`}>
             {app.closed ? 'The whole app is CLOSED.' : app.parts.length ? `Open, with ${app.parts.length} part${app.parts.length === 1 ? '' : 's'} closed.` : 'The app is open.'}
+            {!app.closed && app.parts.length > 0 && <div className="flex flex-wrap gap-1.5 mt-2">{app.parts.map((k) => <span key={k} className="text-xs rounded-full bg-amber-500/20 px-2.5 py-0.5">{PARTS.find(([x]) => x === k)?.[1] ?? k}</span>)}</div>}
           </div>
-          <div><p className="text-xs text-slate-400 mb-1">Close only these parts, for everyone</p><PartList value={app.parts} onChange={(v) => setApp({ ...app, parts: v })} /></div>
-          <label className="block"><span className="block text-xs text-slate-400 mb-1">Message shown to shops (optional)</span><input className="input" maxLength={300} value={app.message} onChange={(e) => setApp({ ...app, message: e.target.value })} placeholder="We are updating ShopOS. Back shortly." /></label>
-          <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={app.backAt} onChange={(e) => setApp({ ...app, backAt: e.target.value })} /></label>
+          <div><p className="text-xs text-slate-400 mb-1">Close only these parts, for everyone</p><PartList value={app.parts} disabled={busy} onChange={(v) => { setApp({ ...app, parts: v }); void saveApp(app.closed, v); }} /></div>
+          <label className="block"><span className="block text-xs text-slate-400 mb-1">Message shown to shops (optional, saved when you leave the box)</span><input className="input" maxLength={300} value={app.message} onBlur={() => { if (app.closed || app.parts.length) void saveApp(app.closed); }} onChange={(e) => setApp({ ...app, message: e.target.value })} placeholder="We are updating ShopOS. Back shortly." /></label>
+          <label className="block"><span className="block text-xs text-slate-400 mb-1">Back around (optional)</span><input className="input" type="datetime-local" value={app.backAt} onBlur={() => { if (app.closed || app.parts.length) void saveApp(app.closed); }} onChange={(e) => setApp({ ...app, backAt: e.target.value })} /></label>
           <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 p-3">
             <div className="min-w-0"><p className="text-sm font-medium">Demo</p><p className="text-xs text-slate-400">{demoOpen ? 'Open: anyone can try the practice shop.' : 'Closed: the Try the demo buttons stop working.'}</p></div>
             {demoOpen
@@ -329,7 +403,6 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
           </div>
           {msg && <p className="text-sm text-slate-300" role="status">{msg}</p>}
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => void saveApp(app.closed)} disabled={busy} className="btn-secondary text-sm">Save parts and message</button>
             {app.closed || app.parts.length > 0
               ? <button onClick={() => void saveApp(false, [])} disabled={busy} className="btn-primary text-sm">Open everything again</button>
               : null}
@@ -337,6 +410,8 @@ function MaintenanceCard({ supabase }: { supabase: SupabaseClient }) {
           </div>
         </Card>
       )}
+
+      {tab === 'schedule' && <ScheduleTab supabase={supabase} PartList={PartList} />}
 
       {tab === 'business' && (
         <div className="space-y-3">
