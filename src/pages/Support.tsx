@@ -35,9 +35,28 @@ export default function Support({ supabase }: { supabase: SupabaseClient }) {
             </select>
           </div>
           <p className="text-xs text-slate-400 mt-1">{t.category} · {new Date(t.created_at).toLocaleString()}</p>
-          <p className="text-sm text-slate-300 mt-2">{t.description}</p>
+          <TicketText supabase={supabase} description={t.description} />
         </Card>
       ))}
+    </div>
+  );
+}
+
+const SHOT = /\n*\[\[shot:([0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg)\]\]/i;
+/** The request text, with the screenshot the shop sent (if any) shown under it. */
+function TicketText({ supabase, description }: { supabase: SupabaseClient; description: string }) {
+  const m = description.match(SHOT);
+  const text = description.replace(SHOT, '').trim();
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let off = false;
+    if (m) void supabase.storage.from('support-shots').createSignedUrl(m[1], 600).then(({ data }) => { if (!off) setUrl(data?.signedUrl ?? null); });
+    return () => { off = true; };
+  }, [m?.[1]]);
+  return (
+    <div className="mt-2 space-y-2">
+      <p className="text-sm text-slate-300 whitespace-pre-wrap">{text}</p>
+      {m && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Screenshot from the shop" className="max-h-64 rounded-lg border border-slate-700" /></a> : <p className="text-xs text-slate-400">A screenshot was attached.</p>)}
     </div>
   );
 }
