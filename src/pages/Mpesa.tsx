@@ -5,6 +5,7 @@ import { Card, EmptyState, ErrorText, Skeleton } from '../components/ui';
 import { friendlyError } from '../lib/friendlyError';
 import * as pay from '../lib/payAdmin';
 import { askConfirm, askPrompt } from '../lib/dialog';
+import { ChannelBadge } from '../components/ChannelBadge';
 
 interface Row {
   source_id: string; business_id: string; business_name: string; label: string; kind: string; number: string; mode: string; status: string;
@@ -84,6 +85,43 @@ function PlatformPayHero({ supabase }: { supabase: SupabaseClient }) {
 }
 
 /** M-Pesa for the whole platform: connect each business's own number, turn on automatic refunds, and set ShopOS's own number for package payments. */
+/** Payment channels: switch a channel off and no new payment can start on it (the server refuses it). Changes save at once. */
+function ChannelsTab({ supabase }: { supabase: SupabaseClient }) {
+  const [rows, setRows] = useState<{ key: 'mpesa' | 'payhero'; label: string; enabled: boolean; updated_at: string }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = async () => { const { data, error } = await supabase.rpc('admin_payment_channels'); if (error) { setErr(friendlyError(error)); return; } setErr(null); setRows(data as never); };
+  useEffect(() => { void load(); }, []);
+  async function flip(k: string, on: boolean) {
+    setRows((r) => r ? r.map((x) => x.key === k ? { ...x, enabled: on } : x) : r);
+    const { error } = await supabase.rpc('admin_set_payment_channel', { p_key: k, p_enabled: on });
+    if (error) { setErr(friendlyError(error)); void load(); }
+  }
+  const DESC: Record<string, string> = {
+    mpesa: 'Direct Safaricom (Daraja): shops connected to M-Pesa by you, and package payments to the ShopOS number.',
+    payhero: 'PayHero: owners who connected their own PayHero account, and package payments through the ShopOS PayHero channel.',
+  };
+  if (err && !rows) return <ErrorText>{err}</ErrorText>;
+  if (!rows) return <Skeleton />;
+  return (
+    <div className="space-y-3 max-w-2xl">
+      <p className="text-xs text-slate-400">Turn a channel off during an outage or while you fix its keys. New payments on it are refused straight away and the shop sees that the channel is paused. Payments already sent are not affected.</p>
+      <ErrorText>{err}</ErrorText>
+      {rows.map((c) => (
+        <Card key={c.key} className="p-4 flex items-center gap-3">
+          <ChannelBadge channel={c.key} size={44} />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{c.label}</p>
+            <p className="text-xs text-slate-400">{DESC[c.key]}</p>
+            <p className={`text-xs mt-1 ${c.enabled ? 'text-emerald-400' : 'text-rose-400'}`}>{c.enabled ? 'On: payments can start' : 'Off: new payments are refused'}</p>
+          </div>
+          <button role="switch" aria-checked={c.enabled} aria-label={`${c.label} channel`} onClick={() => void flip(c.key, !c.enabled)}
+            className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${c.enabled ? 'bg-emerald-600' : 'bg-slate-600'}`}><span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all ${c.enabled ? 'left-[22px]' : 'left-0.5'}`} /></button>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [pkgs, setPkgs] = useState<PkgPay[]>([]);
@@ -93,7 +131,7 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   const [payoutFor, setPayoutFor] = useState<Row | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [sub, setSub] = useState<'businesses' | 'keys' | 'number' | 'packages' | 'payhero'>('businesses');
+  const [sub, setSub] = useState<'channels' | 'businesses' | 'keys' | 'number' | 'packages' | 'payhero'>('channels');
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_mpesa_list');
@@ -129,18 +167,19 @@ export default function Mpesa({ supabase }: { supabase: SupabaseClient }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-display font-semibold text-lg">M-Pesa</h2>
+        <h2 className="font-display font-semibold text-lg inline-flex items-center gap-2">Payments <ChannelBadge channel="mpesa" size={22} /> <ChannelBadge channel="payhero" size={22} /></h2>
         <p className="text-xs text-slate-400">A business asks to be connected from its own app. M-Pesa does not work for it until you press Approve. Save the Safaricom keys once below and every approved shop reuses them. Keys are encrypted and can never be read back, not even by you.</p>
       </div>
       <ErrorText>{err}</ErrorText>
       {msg && <p className="text-sm text-field-600" role="status">{msg}</p>}
 
       <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-700 -mx-1 px-1">
-        {([['businesses', `Businesses${waiting.length ? ` (${waiting.length})` : ''}`], ['keys', 'Shared keys'], ['number', 'ShopOS number'], ['payhero', 'PayHero'], ['packages', 'Package payments']] as const).map(([k, l]) => (
+        {([['channels', 'Channels'], ['businesses', `Businesses${waiting.length ? ` (${waiting.length})` : ''}`], ['keys', 'M-Pesa keys'], ['number', 'ShopOS M-Pesa number'], ['payhero', 'PayHero'], ['packages', 'Package payments']] as const).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px ${sub === k ? 'border-field-600 text-ink' : 'border-transparent text-slate-400 hover:text-ink'}`}>{l}</button>
         ))}
       </div>
 
+      {sub === 'channels' && <ChannelsTab supabase={supabase} />}
       {sub === 'keys' && <SharedKeys />}
       {sub === 'number' && <PlatformNumber />}
       {sub === 'payhero' && <PlatformPayHero supabase={supabase} />}

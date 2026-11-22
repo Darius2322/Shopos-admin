@@ -144,7 +144,7 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 }
 
 const TAB_LABELS: Record<Tab, string> = {
-  mpesa: 'M-Pesa', assistant: 'Assistant', golive: 'Go live', website: 'Website', live: 'Live terminal', notifications: 'Notifications',
+  mpesa: 'Payments', assistant: 'Assistant', golive: 'Go live', website: 'Website', live: 'Live terminal', notifications: 'Notifications',
   statusup: 'Status: Uptime', statuslog: 'Status: Downtime log', statuspage: 'Status: Public page', lastseen: 'Last seen', dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
   bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };

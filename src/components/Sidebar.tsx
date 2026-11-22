@@ -17,7 +17,7 @@ export const TABS: [Tab, string, any][] = [
   ['statuslog', 'Downtime log', ScrollText],
   ['statuspage', 'Public status page', Globe],
   ['bookings', 'Bookings', CalendarCheck],
-  ['mpesa', 'M-Pesa', Wallet],
+  ['mpesa', 'Payments', Wallet],
   ['packages', 'Packages', Package],
   ['businesstypes', 'Business Types', Palette],
   ['softdelete', 'Soft Delete', Trash2],

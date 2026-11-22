@@ -24,51 +24,129 @@ interface LogRow { id: string; at: string; app: string; action: string; from_sha
 type Sub = 'overview' | 'analytics' | 'release' | 'history' | 'apps' | 'safety' | 'preview' | 'links' | 'activity';
 type Any = Record<string, any>;
 
+type Area = 'pos' | 'booking' | 'website' | 'infra';
 interface ChFile { name: string; status: string; add: number; del: number }
-interface ChCommit { sha: string; short: string; message: string; body: string; date?: string; author?: string; url?: string; additions: number | null; deletions: number | null; files: ChFile[] }
+interface ChCommit { sha: string; short: string; message: string; body: string; date?: string; author?: string; url?: string; additions: number | null; deletions: number | null; files: ChFile[]; areas: Area[]; canRelease: boolean }
 const FILE_COLOR: Record<string, string> = { added: 'text-emerald-400', removed: 'text-rose-400', modified: 'text-amber-400', renamed: 'text-sky-400' };
+const AREA_LABEL: Record<Area, string> = { pos: 'POS', booking: 'Online booking', website: 'Website', infra: 'Backend / build' };
+const AREA_CLS: Record<Area, string> = { pos: 'bg-sky-500/15 text-sky-300', booking: 'bg-violet-500/15 text-violet-300', website: 'bg-emerald-500/15 text-emerald-300', infra: 'bg-slate-500/20 text-slate-300' };
+const REL_ERR: Record<string, string> = {
+  merge_commit: 'This is a merge, so it cannot be released alone. Use Release to production for everything.',
+  too_big: 'This change touches too many files to release alone. Use Release to production.',
+  not_on_staging: 'This change is not on staging.',
+  already_released: 'This change is already on production.',
+  conflict: 'Production changed while this was being released. Try again.',
+  token_cannot_write: 'The GitHub token cannot change this repository. Give it Contents write access.',
+};
 
-/** What is waiting on staging, change by change. Tap a change to see its full note and the files it touches. */
-function ChangesPanel({ call, repo, onClose }: { call: (b: Any) => Promise<Any>; repo: string; onClose: () => void }) {
-  const [data, setData] = useState<{ ahead: number; compareUrl: string | null; totalFiles: number; commits: ChCommit[] } | null>(null);
+/** The changes waiting on staging (or, for the admin portal, the ones that recently went live) in a window, one row per change.
+ *  Tap a row for its details. A change can be released on its own, or every change of one kind (POS, online booking…) in one go. */
+function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { call: (b: Any) => Promise<Any>; repo: string; mode: 'staging' | 'recent'; initial: Area | 'all'; title: string; onClose: () => void; onDone: () => void }) {
+  const [list, setList] = useState<ChCommit[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Area | 'all'>(initial);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [compare, setCompare] = useState<string | null>(null);
+  const recent = mode === 'recent';
   useEffect(() => {
     let off = false;
-    void call({ action: 'changes', repo }).then((r) => { if (off) return; if (r?.error) setErr('Could not load the changes. Try again in a moment.'); else { setData(r as never); setOpen((r as { commits?: ChCommit[] }).commits?.[0]?.sha ?? null); } }).catch(() => { if (!off) setErr('Could not load the changes.'); });
-    return () => { off = true; };
+    void call(recent ? { action: 'changes', repo, recent: true, app: 'admin' } : { action: 'changes', repo, app: 'web' }).then((r) => {
+      if (off) return;
+      if (r?.error) { setErr('Could not load the changes. Try again in a moment.'); return; }
+      setList((r.commits ?? []) as ChCommit[]); setCompare((r.compareUrl as string | null) ?? null);
+    }).catch(() => { if (!off) setErr('Could not load the changes.'); });
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', esc);
+    return () => { off = true; window.removeEventListener('keydown', esc); };
   }, []);
+  const counts = useMemo(() => { const m: Record<string, number> = {}; (list ?? []).forEach((c) => c.areas.forEach((a) => { m[a] = (m[a] ?? 0) + 1; })); return m; }, [list]);
+  const shown = (list ?? []).filter((c) => filter === 'all' || c.areas.includes(filter));
+  const fail = (r: Any) => { const k = String(r.error); setErr(k === 'depends_on_earlier' ? `This change builds on earlier ones (it touches ${(r.files as string[]).join(', ')}). Release the earlier changes first.` : REL_ERR[k] ?? 'Could not release this change.'); };
+  async function releaseSha(c: ChCommit): Promise<boolean> {
+    const r = await call({ action: 'release_one', repo, app: 'web', sha: c.sha });
+    if (r?.error) { fail(r); return false; }
+    setList((l) => (l ?? []).filter((x) => x.sha !== c.sha)); onDone(); return true;
+  }
+  async function releaseOne(c: ChCommit) {
+    if (!(await askConfirm(`Release only “${c.message}” to production? It goes live in about a minute, without the other ${Math.max(0, (list?.length ?? 1) - 1)} change${(list?.length ?? 1) === 2 ? '' : 's'} waiting on staging.`))) return;
+    setBusy(c.sha); setErr(null); setNote(null);
+    const ok = await releaseSha(c); setBusy(null);
+    if (ok) setNote('Released. It is on production in about a minute.');
+  }
+  async function releaseGroup() {
+    const todo = shown.filter((c) => c.canRelease).reverse(); // oldest first, so a change that builds on an earlier one goes after it
+    if (todo.length === 0) return;
+    const label = filter === 'all' ? 'all' : AREA_LABEL[filter as Area];
+    if (!(await askConfirm(`Release ${todo.length} ${label} change${todo.length === 1 ? '' : 's'} to production, oldest first? The other kinds of change stay on staging.`))) return;
+    setBusy('group'); setErr(null); setNote(null);
+    let n = 0;
+    for (const c of todo) { if (!(await releaseSha(c))) { setNote(n ? `${n} released before it stopped.` : null); setBusy(null); return; } n += 1; }
+    setBusy(null); setNote(`${n} change${n === 1 ? '' : 's'} released. Production updates in about a minute.`);
+  }
+  const chip = (on: boolean) => `text-xs px-3 py-1.5 rounded-full border ${on ? 'border-field-500 bg-field-500/15 text-field-500' : 'border-slate-700 text-slate-400'}`;
   return (
-    <div className="rounded-lg border border-slate-700 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{data ? `${data.ahead} change${data.ahead === 1 ? '' : 's'} not on production yet` : 'Changes waiting on staging'}{data && data.totalFiles ? <span className="text-xs text-slate-400 font-normal"> · {data.totalFiles} file{data.totalFiles === 1 ? '' : 's'} in all</span> : null}</p>
-        <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-200">Close</button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-slate-700 bg-slate-900 text-slate-100">
+        <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-800">
+          <div>
+            <p className="font-medium">{title}</p>
+            <p className="text-xs text-slate-400">{list ? (recent ? `The last ${list.length} changes that went live` : `${list.length} change${list.length === 1 ? '' : 's'} not on production yet`) : 'Loading…'}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-200 p-1"><XCircle className="w-5 h-5" /></button>
+        </div>
+        {!recent && list && list.length > 0 && (
+          <div className="px-4 pt-3 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <button className={chip(filter === 'all')} onClick={() => setFilter('all')}>All ({list.length})</button>
+              {(['pos', 'booking', 'website', 'infra'] as Area[]).filter((a) => counts[a]).map((a) => <button key={a} className={chip(filter === a)} onClick={() => setFilter(a)}>{AREA_LABEL[a]} ({counts[a]})</button>)}
+            </div>
+            <button onClick={() => void releaseGroup()} disabled={busy !== null || shown.filter((c) => c.canRelease).length === 0} className="btn-primary text-xs inline-flex items-center gap-1 disabled:!bg-slate-700 disabled:!text-slate-400 disabled:opacity-100">
+              {busy === 'group' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} {filter === 'all' ? 'Release all these' : `Release ${AREA_LABEL[filter as Area]} changes only`} ({shown.filter((c) => c.canRelease).length})
+            </button>
+            <p className="text-[11px] text-slate-500">The website, POS and online booking are one web app, so a release updates it for everyone. Releasing one kind only sends those changes; the rest stay on staging until you release them.</p>
+          </div>
+        )}
+        <div className="p-4 overflow-y-auto space-y-2">
+          {err && <p className="text-xs text-rose-400">{err}</p>}
+          {note && <p className="text-xs text-emerald-400">{note}</p>}
+          {!list && !err && <p className="text-xs text-slate-400">Loading…</p>}
+          {list && shown.length === 0 && <p className="text-sm text-slate-400">{list.length === 0 ? (recent ? 'No changes found.' : 'Nothing is waiting. Staging and production are the same.') : 'No changes of this kind.'}</p>}
+          <ul className="space-y-2">
+            {shown.map((c) => {
+              const isOpen = open === c.sha;
+              return (
+                <li key={c.sha} className="rounded-lg border border-slate-700">
+                  <button className="w-full text-left p-3" onClick={() => setOpen(isOpen ? null : c.sha)} aria-expanded={isOpen}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm">{c.message}</p>
+                      <span className="text-[11px] text-slate-500 shrink-0">{isOpen ? 'Hide' : 'Details'}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+                      <span>{when(c.date)}</span><span>· {c.short}</span>{c.author && <span>· {c.author}</span>}{c.additions !== null && <span>· +{c.additions} −{c.deletions}</span>}
+                      {!recent && c.areas.map((a) => <span key={a} className={`px-2 py-0.5 rounded-full ${AREA_CLS[a]}`}>{AREA_LABEL[a]}</span>)}
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="px-3 pb-3 space-y-2 border-t border-slate-800 pt-2">
+                      {c.body ? <p className="text-xs text-slate-300 whitespace-pre-wrap">{c.body}</p> : <p className="text-xs text-slate-500">No extra note on this change.</p>}
+                      {c.files.length > 0 && <ul className="text-[11px] space-y-0.5 max-h-48 overflow-y-auto">{c.files.map((f) => <li key={f.name} className="flex justify-between gap-2"><span className="truncate"><span className={FILE_COLOR[f.status] ?? 'text-slate-400'}>{f.status}</span> {f.name}</span><span className="text-slate-500 shrink-0">+{f.add} −{f.del}</span></li>)}</ul>}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {!recent && (c.canRelease
+                          ? <button onClick={() => void releaseOne(c)} disabled={busy !== null} className="btn-primary text-xs inline-flex items-center gap-1 disabled:opacity-50">{busy === c.sha ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} Release this change alone</button>
+                          : <span className="text-[11px] text-slate-500">A merge cannot be released alone.</span>)}
+                        {c.url && <a href={c.url} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">Open on GitHub <ExternalLink className="w-3 h-3" /></a>}
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {compare && <a href={compare} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">{recent ? 'All changes on GitHub' : 'Compare staging with production on GitHub'} <ExternalLink className="w-3 h-3" /></a>}
+        </div>
       </div>
-      {err && <p className="text-xs text-rose-400">{err}</p>}
-      {!data && !err && <p className="text-xs text-slate-400">Loading…</p>}
-      {data && (
-        <ul className="divide-y divide-slate-800">
-          {data.commits.map((c) => {
-            const isOpen = open === c.sha;
-            return (
-              <li key={c.sha} className="py-2">
-                <button className="w-full text-left" onClick={() => setOpen(isOpen ? null : c.sha)} aria-expanded={isOpen}>
-                  <p className="text-sm">{c.message}</p>
-                  <p className="text-[11px] text-slate-400">{c.short} · {when(c.date)}{c.author ? ` · ${c.author}` : ''}{c.additions !== null ? ` · +${c.additions} −${c.deletions}` : ''} · {isOpen ? 'hide details' : 'show details'}</p>
-                </button>
-                {isOpen && (
-                  <div className="mt-2 space-y-2">
-                    {c.body && <p className="text-xs text-slate-300 whitespace-pre-wrap">{c.body}</p>}
-                    {c.files.length > 0 && <ul className="text-[11px] space-y-0.5 max-h-48 overflow-y-auto">{c.files.map((f) => <li key={f.name} className="flex justify-between gap-2"><span className="truncate"><span className={FILE_COLOR[f.status] ?? 'text-slate-400'}>{f.status}</span> {f.name}</span><span className="text-slate-500 shrink-0">+{f.add} −{f.del}</span></li>)}</ul>}
-                    {c.url && <a href={c.url} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">See the full change on GitHub <ExternalLink className="w-3 h-3" /></a>}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {data?.compareUrl && <a href={data.compareUrl} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">Compare staging with production on GitHub <ExternalLink className="w-3 h-3" /></a>}
     </div>
   );
 }
@@ -506,13 +584,15 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
             <Card key={d.id} className="p-4 space-y-2.5">
               <div><div className="font-medium text-sm">{d.label}</div><div className="text-[11px] text-slate-500">{d.note}</div></div>
               <div className="rounded-lg border border-field-500/30 p-2.5 space-y-0.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] text-field-500 font-medium">PRODUCTION · live now</span>{st && <Pill ok text={`Live for ${span(st.liveSince, now)}`} />}</div>
-                <div className="text-sm">{live?.message ?? '—'}</div><div className="text-xs text-slate-500">{live?.short ?? ''}{live?.short ? ' · ' : ''}since {when(st?.liveSince)} · last update {when(live?.date)}</div></div>
+                <div className="text-sm">{live?.message ?? '—'}</div><div className="text-xs text-slate-400">Running {verLine(isAdmin ? vers?.admin : vers?.production)}</div><div className="text-xs text-slate-500">{live?.short ?? ''}{live?.short ? ' · ' : ''}since {when(st?.liveSince)} · last update {when(live?.date)}</div></div>
               <div className="rounded-lg border border-amber-500/30 p-2.5 space-y-0.5"><div className="flex items-center justify-between gap-2"><span className="text-[11px] text-amber-500 font-medium">STAGING · being tested</span>
                 {isAdmin ? <span className="text-xs text-slate-500">No staging copy</span> : web && (web.ahead > 0 ? <button onClick={() => setChangesFor(changesFor === d.id ? null : d.id)} aria-expanded={changesFor === d.id} aria-label="See the changes waiting on staging" className="rounded-full ring-1 ring-transparent hover:ring-rust-500/60"><Pill ok={false} text={`${web.ahead} change${web.ahead === 1 ? '' : 's'} ahead · details`} /></button> : <Pill ok text="Same as production" />)}</div>
                 {isAdmin ? <div className="text-xs text-slate-500">Changes go live as soon as they are pushed to GitHub.</div> : <><div className="text-sm">{web?.staging?.message ?? '—'}</div><div className="text-xs text-slate-500">{web?.staging?.short ?? ''}{web?.staging?.short ? ' · ' : ''}{when(web?.staging?.date)}</div></>}</div>
-              {!isAdmin && changesFor === d.id && <ChangesPanel call={call} repo={web?.repo ?? 'Darius2322/shopos-app'} onClose={() => setChangesFor(null)} />}
+              {changesFor === d.id && <ChangesModal call={call} repo={isAdmin ? ADMIN_REPO : APP_REPO} mode={isAdmin ? 'recent' : 'staging'} initial={d.id === 'owner' ? 'pos' : d.id === 'booker' ? 'booking' : 'all'} title={isAdmin ? 'Recent admin portal changes' : `Changes waiting on staging · ${d.label}`} onClose={() => setChangesFor(null)} onDone={() => void loadAll()} />}
               <div className="flex flex-wrap gap-2 text-xs">
                 {!isAdmin && <button onClick={() => void releaseOne('web')} disabled={busy || !web || web.ahead === 0} className="btn-primary text-xs inline-flex items-center gap-1 disabled:!bg-slate-700 disabled:!text-slate-400 disabled:opacity-100"><Rocket className="w-3 h-3" />{web && web.ahead === 0 ? 'Nothing to release' : 'Release to production'}</button>}
+                {!isAdmin && <button onClick={() => setChangesFor(d.id)} disabled={!web || web.ahead === 0} className="btn-secondary text-xs inline-flex items-center gap-1 disabled:opacity-50"><ScrollText className="w-3 h-3" />Choose what to release</button>}
+                {isAdmin && <button onClick={() => setChangesFor(d.id)} className="btn-secondary text-xs inline-flex items-center gap-1"><ScrollText className="w-3 h-3" />Recent changes</button>}
                 <button onClick={() => { setHistProd(d.id); setSub('history'); }} className="btn-secondary text-xs inline-flex items-center gap-1"><Undo2 className="w-3 h-3" />Move back</button>
                 <button onClick={() => { setPreviewStart(d.id); setSub('preview'); }} className="btn-secondary text-xs inline-flex items-center gap-1"><MonitorSmartphone className="w-3 h-3" />Preview</button>
                 <a href={prodUrl} target="_blank" rel="noreferrer" className="btn-secondary text-xs inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" />Open live</a>
