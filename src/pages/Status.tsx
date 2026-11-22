@@ -26,6 +26,7 @@ const fmtHour = (h: string) => { const a = new Date(h), b = new Date(a.getTime()
 /** What happened in one day or one hour of one part: uptime, failed checks, each outage with when it began and how long it lasted. */
 function DetailPanel({ k, from, to, title, onClose }: { k: string; from: Date; to: Date; title: string; onClose: () => void }) {
   const [d, setD] = useState<Det | null | undefined>(undefined);
+  const [hourSel, setHourSel] = useState<string | null>(null);
   useEffect(() => {
     let off = false; setD(undefined);
     if (!supabase) { setD(null); return; }
@@ -55,9 +56,15 @@ function DetailPanel({ k, from, to, title, onClose }: { k: string; from: Date; t
             <ul className="text-[11px] grid grid-cols-2 gap-x-3 gap-y-0.5">{d.rows.map((r) => <li key={r.t} className="flex justify-between"><span>{fmtTime(r.t)}</span><span className={r.ok ? 'text-emerald-400' : 'text-rose-400'}>{r.ok ? 'Up' : 'Down'}{r.code ? ` · ${r.code}` : ''}</span></li>)}</ul>
           ) : (
             <div>
-              <p className="text-[11px] text-slate-400 mb-1">Hour by hour</p>
-              <div className="flex gap-[2px] h-6">{d.rows.map((r) => <div key={r.t} title={`${fmtTime(r.t)}: ${r.fail ? `${r.fail} of ${r.n} checks failed` : 'all checks passed'}`} className={`flex-1 rounded-sm ${r.fail ? ((r.fail as number) >= (r.n as number) ? 'bg-rose-500' : 'bg-amber-400') : 'bg-emerald-500'}`} />)}</div>
-              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5"><span>{fmtTime(d.rows[0]?.t ?? d.from)}</span><span>{fmtTime(d.rows[d.rows.length - 1]?.t ?? d.to)}</span></div>
+              <p className="text-[11px] text-slate-400 mb-1">Hour by hour. Tap an hour for its checks.</p>
+              <div className="flex gap-[2px] h-8">{Array.from({ length: 24 }, (_, i) => {
+                const t = new Date(new Date(d.from).getTime() + i * 3600_000).toISOString();
+                const r = d.rows.find((x) => new Date(x.t).getTime() === new Date(t).getTime());
+                const tone = !r ? 'bg-slate-700' : r.fail ? ((r.fail as number) >= (r.n as number) ? 'bg-rose-500' : 'bg-amber-400') : 'bg-emerald-500';
+                return <button key={t} type="button" disabled={!r} onClick={() => setHourSel(hourSel === t ? null : t)} aria-pressed={hourSel === t} aria-label={`${fmtTime(t)}: ${!r ? 'no checks' : r.fail ? `${r.fail} of ${r.n} checks failed` : 'all checks passed'}`} title={`${fmtTime(t)}: ${!r ? 'no checks' : r.fail ? `${r.fail} of ${r.n} checks failed` : 'all checks passed'}`} className={`flex-1 rounded-sm ${tone} ${hourSel === t ? 'ring-2 ring-offset-1 ring-slate-500' : ''}`} />;
+              })}</div>
+              <div className="flex gap-[2px] text-[9px] text-slate-400 mt-0.5">{Array.from({ length: 24 }, (_, i) => <span key={i} className="flex-1 text-center overflow-visible whitespace-nowrap">{i % 4 === 0 ? String(new Date(new Date(d.from).getTime() + i * 3600_000).getHours()).padStart(2, '0') : ''}</span>)}</div>
+              {hourSel && <DetailPanel k={k} from={new Date(hourSel)} to={new Date(new Date(hourSel).getTime() + 3600_000)} title={fmtHour(hourSel)} onClose={() => setHourSel(null)} />}
             </div>
           )}
         </>
@@ -119,6 +126,7 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  const [openInc, setOpenInc] = useState<number | null>(null);
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_status_overview');
@@ -203,12 +211,20 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
         {o.incidents.length === 0 ? <EmptyState message="No downtime recorded in the last 30 days." /> : (
           <Card>
             <ul className="divide-y divide-slate-800">
-              {o.incidents.map((i, idx) => (
-                <li key={idx} className="p-3 flex items-center justify-between gap-3 text-sm">
-                  <div><p className="font-medium">{i.label}</p><p className="text-xs text-slate-400">{new Date(i.start).toLocaleString()} to {new Date(i.last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
-                  <span className="text-rose-400 shrink-0">about {dur(i.checks)}</span>
-                </li>
-              ))}
+              {o.incidents.map((i, idx) => {
+                const isOpen = openInc === idx;
+                const from = new Date(Math.floor(new Date(i.start).getTime() / 3600_000) * 3600_000);
+                const to = new Date(Math.min(Math.floor(new Date(i.last).getTime() / 3600_000) * 3600_000 + 3600_000, from.getTime() + 24 * 3600_000));
+                return (
+                  <li key={idx}>
+                    <button type="button" onClick={() => setOpenInc(isOpen ? null : idx)} aria-expanded={isOpen} className="w-full text-left p-3 flex items-center justify-between gap-3 text-sm hover:bg-slate-800/40">
+                      <div><p className="font-medium">{i.label}</p><p className="text-xs text-slate-400">{new Date(i.start).toLocaleString()} to {new Date(i.last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
+                      <span className="text-rose-400 shrink-0">about {dur(i.checks)} · {isOpen ? 'hide' : 'details'}</span>
+                    </button>
+                    {isOpen && <div className="px-3 pb-3"><DetailPanel k={i.key} from={from} to={to} title={`${i.label} · ${new Date(i.start).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}`} onClose={() => setOpenInc(null)} /></div>}
+                  </li>
+                );
+              })}
             </ul>
           </Card>
         )}
