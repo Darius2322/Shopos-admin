@@ -8,7 +8,7 @@ interface Biz {
   created_at: string; last_activity: string | null; last_kind: string | null; never_used: boolean; days_inactive: number; days_since_signup: number;
   sales: number; products: number; staff: number; last_sale: string | null; last_login: string | null; onboarding_done?: boolean | null; onboarding_step?: string | number | null; activation_expires_at?: string | null;
 }
-const WINDOWS = [7, 14, 30, 60, 90];
+const WINDOWS = [0, 1, 3, 7, 14, 30, 60, 90];
 const d = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–');
 const span = (n: number) => (n >= 60 ? `${Math.floor(n / 30)} months` : n === 1 ? '1 day' : `${n} days`);
 const waNumber = (p: string | null) => { const x = (p ?? '').replace(/\D/g, ''); return x.startsWith('0') ? `254${x.slice(1)}` : x.startsWith('7') || x.startsWith('1') ? `254${x}` : x; };
@@ -39,7 +39,8 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-xs text-slate-400">Quiet for at least</span>
-        {WINDOWS.map((w) => <button key={w} onClick={() => setDays(w)} className={`rounded-full border px-3 py-1 text-sm ${days === w ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-600 text-slate-300'}`}>{w} days</button>)}
+        {WINDOWS.map((w) => <button key={w} onClick={() => setDays(w)} className={`rounded-full border px-3 py-1 text-sm ${days === w ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-600 text-slate-300'}`}>{w === 0 ? 'Any' : w === 1 ? '1 day' : `${w} days`}</button>)}
+        <input type="number" min={0} max={365} inputMode="numeric" aria-label="Custom number of days" placeholder="Days" className="w-20 rounded-full border border-slate-600 bg-transparent px-3 py-1 text-sm" onChange={(e) => { const v = parseInt(e.target.value, 10); if (!Number.isNaN(v) && v >= 0 && v <= 365) setDays(v); }} />
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         {([['all', 'All'], ['shop', 'Shops (POS)'], ['booking', 'Booking']] as const).map(([k, l]) => <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-3 py-1 text-xs ${kind === k ? 'bg-slate-200 text-slate-900 border-slate-200' : 'border-slate-600 text-slate-300'}`}>{l}</button>)}
@@ -48,7 +49,7 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
         <input className="ml-auto rounded-xl border border-slate-600 bg-transparent px-3 py-1.5 text-sm w-48" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
       </div>
       {err && <ErrorText>{err}</ErrorText>}
-      {rows === null ? <Skeleton /> : shown.length === 0 ? <EmptyState message={`No businesses have been inactive for ${days} days or more. Nice.`} /> : (
+      {rows === null ? <Skeleton /> : shown.length === 0 ? <EmptyState message={`${days === 0 ? 'No businesses registered yet.' : `No businesses have been inactive for ${days} day${days === 1 ? '' : 's'} or more. Nice.`}`} /> : (
         <Card>
           <p className="text-xs text-slate-400 mb-2">{shown.length} business{shown.length === 1 ? '' : 'es'}, longest quiet first</p>
           <ul className="divide-y divide-slate-700/60">

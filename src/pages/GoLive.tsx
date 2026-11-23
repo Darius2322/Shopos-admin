@@ -41,7 +41,7 @@ const REL_ERR: Record<string, string> = {
 
 /** The changes waiting on staging (or, for the admin portal, the ones that recently went live) in a window, one row per change.
  *  Tap a row for its details. A change can be released on its own, or every change of one kind (POS, online booking…) in one go. */
-function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { call: (b: Any) => Promise<Any>; repo: string; mode: 'staging' | 'recent'; initial: Area | 'all'; title: string; onClose: () => void; onDone: () => void }) {
+function ChangesModal({ inline = false, call, repo, mode, initial, title, onClose, onDone }: { inline?: boolean; call: (b: Any) => Promise<Any>; repo: string; mode: 'staging' | 'recent'; initial: Area | 'all'; title: string; onClose: () => void; onDone: () => void }) {
   const [list, setList] = useState<ChCommit[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -57,7 +57,7 @@ function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { c
       if (r?.error) { setErr('Could not load the changes. Try again in a moment.'); return; }
       setList((r.commits ?? []) as ChCommit[]); setCompare((r.compareUrl as string | null) ?? null);
     }).catch(() => { if (!off) setErr('Could not load the changes.'); });
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !inline) onClose(); };
     window.addEventListener('keydown', esc);
     return () => { off = true; window.removeEventListener('keydown', esc); };
   }, []);
@@ -87,14 +87,14 @@ function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { c
   }
   const chip = (on: boolean) => `text-xs px-3 py-1.5 rounded-full border ${on ? 'border-field-500 bg-field-500/15 text-field-500' : 'border-slate-700 text-slate-400'}`;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-slate-700 bg-slate-900 text-slate-100">
+    <div className={inline ? '' : 'fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4'} role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : true} aria-label={title} onClick={(e) => { if (!inline && e.target === e.currentTarget) onClose(); }}>
+      <div className={inline ? 'w-full flex flex-col rounded-2xl border border-slate-700 bg-slate-900 text-slate-100' : 'w-full sm:max-w-2xl max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-slate-700 bg-slate-900 text-slate-100'}>
         <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-800">
           <div>
             <p className="font-medium">{title}</p>
             <p className="text-xs text-slate-400">{list ? (recent ? `The last ${list.length} changes that went live` : `${list.length} change${list.length === 1 ? '' : 's'} not on production yet`) : 'Loading…'}</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-200 p-1"><XCircle className="w-5 h-5" /></button>
+          {!inline && <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-200 p-1"><XCircle className="w-5 h-5" /></button>}
         </div>
         {!recent && list && list.length > 0 && (
           <div className="px-4 pt-3 space-y-2">
@@ -291,7 +291,8 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
   const [prevJob, setPrevJob] = useState<{ sha: string; url: string; state: 'starting' | 'building' | 'ready' | 'error'; msg?: string } | null>(null);
   const [access, setAccess] = useState<boolean | null>(null); const [accessBusy, setAccessBusy] = useState(false); const [capOn, setCapOn] = useState<boolean | null>(null);
   const [editId, setEditId] = useState<string | null>(null); const [editAt, setEditAt] = useState('');
-  const [relTab, setRelTab] = useState<'now' | 'release' | 'schedule' | 'previous'>('now');
+  const [relTab, setRelTab] = useState<'now' | 'release' | 'changes' | 'schedule' | 'previous'>('now');
+  const [chSrc, setChSrc] = useState<'web' | 'admin'>('web');
   const [appTab, setAppTab] = useState<'android' | 'desktop' | 'mac'>('android'); const [deskRuns, setDeskRuns] = useState<Run[]>([]);
   const [pick, setPick] = useState<'all' | 'owner' | 'admin' | 'booker'>('all');
   const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true);
@@ -651,7 +652,7 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
       {sub === 'analytics' && <PlatformAnalytics supabase={supabase} />}
 
       {sub === 'release' && web && <div className="space-y-3">
-        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Release sections">{([['now', 'Running now'], ['release', 'Release'], ['schedule', 'Schedule'], ['previous', 'Previous versions']] as const).map(([id, label]) => (
+        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Release sections">{([['now', 'Running now'], ['release', 'Release'], ['changes', 'Changes'], ['schedule', 'Schedule'], ['previous', 'Previous versions']] as const).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={relTab === id} onClick={() => setRelTab(id)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border ${relTab === id ? 'bg-emerald-600 text-white border-transparent' : 'border-slate-600 text-slate-300'}`}>{label}{id === 'schedule' && sched.some((r) => r.status === 'pending') ? ' •' : ''}</button>))}</div>
         {relTab === 'now' && <>{renderRunning()}{renderAccess()}</>}
         {relTab === 'release' && <>
@@ -663,6 +664,14 @@ export default function GoLive({ supabase, onGoNotifications }: { supabase: Supa
           </div>
           <Card className="p-4 text-sm"><div className="font-medium">Building the apps</div><p className="text-xs text-slate-400 mt-1">Android, Windows, Linux and Mac builds are in the Apps menu above.</p></Card>
         </>}
+        {relTab === 'changes' && <div className="space-y-3">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Which changes">
+            {([['web', 'Waiting on staging (website, POS, booking)'], ['admin', 'Recent admin portal changes']] as const).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={chSrc === id} onClick={() => setChSrc(id)} className={`px-3 py-1.5 rounded-full text-xs font-medium border ${chSrc === id ? 'bg-slate-200 text-slate-900 border-transparent' : 'border-slate-700 text-slate-300'}`}>{label}</button>
+            ))}
+          </div>
+          <ChangesModal key={chSrc} inline call={call} repo={chSrc === 'admin' ? ADMIN_REPO : APP_REPO} mode={chSrc === 'admin' ? 'recent' : 'staging'} initial="all" title={chSrc === 'admin' ? 'Recent admin portal changes' : 'Changes waiting on staging'} onClose={() => undefined} onDone={() => void loadAll()} />
+        </div>}
         {relTab === 'schedule' && renderSchedule()}
         {relTab === 'previous' && renderPrevious()}
       </div>}
