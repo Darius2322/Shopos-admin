@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 export function Centered({ children }: { children: ReactNode }) {
   return <div className="min-h-screen flex flex-col items-center justify-center p-4">{children}</div>;
@@ -57,4 +58,23 @@ export function StatCard({ label, value }: { label: string; value: number | stri
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
   return <p className="text-sm text-rust-500">{children}</p>;
+}
+
+/** A pop-up page over the current screen. Closes on the dark background, the X, or Escape. */
+export function Modal({ title, subtitle, onClose, children, wide = false }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-xl'} max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl`}>
+        <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
+          <div className="min-w-0"><p className="font-medium">{title}</p>{subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}</div>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-200 p-1 shrink-0"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-4 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
 }

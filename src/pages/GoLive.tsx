@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Rocket, ExternalLink, RefreshCw, CheckCircle2, XCircle, Smartphone, History, Link2, ScrollText, LayoutDashboard, Undo2, Copy, Activity, MonitorSmartphone, ShieldCheck, Bell, BarChart3, Loader2 } from 'lucide-react';
-import { Card, Skeleton } from '../components/ui';
+import { Card, Modal, Skeleton } from '../components/ui';
 import { askConfirm, showAlert } from '../lib/dialog';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 
@@ -118,10 +118,10 @@ function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { c
               const isOpen = open === c.sha;
               return (
                 <li key={c.sha} className="rounded-lg border border-slate-700">
-                  <button className="w-full text-left p-3" onClick={() => setOpen(isOpen ? null : c.sha)} aria-expanded={isOpen}>
+                  <button className="w-full text-left p-3" onClick={() => setOpen(isOpen ? null : c.sha)} aria-haspopup="dialog">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm">{c.message}</p>
-                      <span className="text-[11px] text-slate-500 shrink-0">{isOpen ? 'Hide' : 'Details'}</span>
+                      <span className="text-[11px] text-slate-500 shrink-0">Details</span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
                       <span>{when(c.date)}</span><span>· {c.short}</span>{c.author && <span>· {c.author}</span>}{c.additions !== null && <span>· +{c.additions} −{c.deletions}</span>}
@@ -129,7 +129,8 @@ function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { c
                     </div>
                   </button>
                   {isOpen && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-slate-800 pt-2">
+                    <Modal title={c.message} subtitle={`${when(c.date)} · ${c.short}${c.author ? ` · ${c.author}` : ''}`} onClose={() => setOpen(null)}>
+                    <div className="space-y-3">
                       {c.body ? <p className="text-xs text-slate-300 whitespace-pre-wrap">{c.body}</p> : <p className="text-xs text-slate-500">No extra note on this change.</p>}
                       {c.files.length > 0 && <ul className="text-[11px] space-y-0.5 max-h-48 overflow-y-auto">{c.files.map((f) => <li key={f.name} className="flex justify-between gap-2"><span className="truncate"><span className={FILE_COLOR[f.status] ?? 'text-slate-400'}>{f.status}</span> {f.name}</span><span className="text-slate-500 shrink-0">+{f.add} −{f.del}</span></li>)}</ul>}
                       <div className="flex flex-wrap items-center gap-3">
@@ -139,6 +140,7 @@ function ChangesModal({ call, repo, mode, initial, title, onClose, onDone }: { c
                         {c.url && <a href={c.url} target="_blank" rel="noreferrer" className="text-xs text-field-500 inline-flex items-center gap-1">Open on GitHub <ExternalLink className="w-3 h-3" /></a>}
                       </div>
                     </div>
+                    </Modal>
                   )}
                 </li>
               );

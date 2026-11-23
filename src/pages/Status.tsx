@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Loader2, RefreshCw, ExternalLink } from 'lucide-react';
-import { Card, EmptyState, ErrorText, Skeleton } from '../components/ui';
+import { Card, EmptyState, ErrorText, Modal, Skeleton } from '../components/ui';
 import { describeError } from '../lib/errors';
 import { askConfirm } from '../lib/dialog';
 import { supabase } from '../lib/supabase';
@@ -49,8 +49,7 @@ function DetailPanel({ k, from, to, title, onClose }: { k: string; from: Date; t
   const isHour = to.getTime() - from.getTime() <= 2 * 3600_000;
   const longest = d ? Math.max(0, ...d.incidents.map((i) => i.n)) : 0;
   return (
-    <div className="rounded-lg border border-slate-700 p-3 mt-2 text-sm space-y-2">
-      <div className="flex justify-between gap-2"><p className="font-medium">{title}</p><button type="button" className="text-xs text-slate-400" onClick={onClose}>Close</button></div>
+    <Modal title={title} onClose={onClose}><div className="text-sm space-y-2">
       {d === undefined && <p className="text-xs text-slate-400">Loading…</p>}
       {d === null && <p className="text-xs text-slate-400">Details are not available right now.</p>}
       {d && d.checks === 0 && <p className="text-xs text-slate-400">No checks were recorded in this period.</p>}
@@ -82,7 +81,7 @@ function DetailPanel({ k, from, to, title, onClose }: { k: string; from: Date; t
           )}
         </>
       )}
-    </div>
+    </div></Modal>
   );
 }
 
@@ -100,6 +99,7 @@ const gap = (a: string | Date, b: string | Date) => { const m = Math.max(0, Math
 /** Everything we know about one stretch of downtime: when, how long, what the server said, what else failed, and the checks around it. */
 function IncidentDetail({ k, start, last, onClose }: { k: string; start: string; last: string; onClose: () => void }) {
   const [d, setD] = useState<IncDet | null | undefined>(undefined);
+  const [hours, setHours] = useState(false);
   useEffect(() => {
     let off = false; setD(undefined);
     if (!supabase) { setD(null); return; }
@@ -107,8 +107,8 @@ function IncidentDetail({ k, start, last, onClose }: { k: string; start: string;
     return () => { off = true; };
   }, [k, start, last]);
   const full = (s: string) => new Date(s).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  if (d === undefined) return <p className="text-xs text-slate-400 p-3">Loading…</p>;
-  if (!d) return <p className="text-xs text-slate-400 p-3">Details are not available right now.</p>;
+  if (d === undefined) return <Modal title="Loading…" onClose={onClose}><p className="text-xs text-slate-400">Loading the details…</p></Modal>;
+  if (!d) return <Modal title="Downtime details" onClose={onClose}><p className="text-xs text-slate-400">Details are not available right now.</p></Modal>;
   const fails = d.failed_checks ?? [];
   const downFor = d.recovered_at ? gap(d.start, d.recovered_at) : gap(d.start, new Date());
   const failedOthers = d.others.filter((o) => o.failed > 0 && o.key !== 'database');
@@ -122,8 +122,7 @@ function IncidentDetail({ k, start, last, onClose }: { k: string; start: string;
   const bodies = [...new Set(probes.map((p) => p.body).filter(Boolean))];
   const slow = fails.map((f) => f.ms).filter((x): x is number => typeof x === 'number');
   return (
-    <div className="rounded-lg border border-slate-700 p-3 mt-2 text-sm space-y-3">
-      <div className="flex justify-between gap-2"><p className="font-medium">{d.label}: {d.ongoing ? 'still down' : 'recovered'}</p><button type="button" className="text-xs text-slate-400" onClick={onClose}>Close</button></div>
+    <Modal title={`${d.label}: ${d.ongoing ? 'still down' : 'recovered'}`} subtitle={full(d.start)} onClose={onClose} wide><div className="text-sm space-y-3">
       <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-slate-400">First failed check</dt><dd>{full(d.start)}</dd>
         <dt className="text-slate-400">Last failed check</dt><dd>{full(d.last_failed)}</dd>
@@ -148,9 +147,11 @@ function IncidentDetail({ k, start, last, onClose }: { k: string; start: string;
       </div>
       <div>
         <p className="font-medium text-xs mb-1">Checks around it (45 minutes either side)</p>
-        <ul className="text-[11px] grid grid-cols-2 gap-x-6 gap-y-0.5 max-h-56 overflow-y-auto">{d.timeline.map((r) => <li key={r.at} className="flex gap-2"><span className="w-16 shrink-0">{fmtTime(r.at)}</span><span className={r.ok ? 'text-emerald-400' : 'text-rose-400 font-medium'}>{r.ok ? 'Up' : 'Down'}{r.code ? ` · ${r.code}` : ' · no reply'}</span><span className="text-slate-500">{r.ms ? `${r.ms} ms` : ''}</span></li>)}</ul>
+        <ul className="text-[11px] grid grid-cols-2 gap-x-6 gap-y-0.5 ">{d.timeline.map((r) => <li key={r.at} className="flex gap-2"><span className="w-16 shrink-0">{fmtTime(r.at)}</span><span className={r.ok ? 'text-emerald-400' : 'text-rose-400 font-medium'}>{r.ok ? 'Up' : 'Down'}{r.code ? ` · ${r.code}` : ' · no reply'}</span><span className="text-slate-500">{r.ms ? `${r.ms} ms` : ''}</span></li>)}</ul>
       </div>
-    </div>
+      <button type="button" className="text-xs text-slate-400 underline" onClick={() => setHours(true)}>Show the full hour-by-hour view</button>
+      {hours && <DetailPanel k={k} from={new Date(Math.floor(new Date(start).getTime() / 3600_000) * 3600_000)} to={new Date(Math.min(Math.floor(new Date(last).getTime() / 3600_000) * 3600_000 + 3600_000, Math.floor(new Date(start).getTime() / 3600_000) * 3600_000 + 24 * 3600_000))} title={`${d.label} · hour by hour`} onClose={() => setHours(false)} />}
+    </div></Modal>
   );
 }
 
@@ -208,7 +209,6 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
   const [msg, setMsg] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [openInc, setOpenInc] = useState<number | null>(null);
-  const [hourView, setHourView] = useState<number | null>(null);
 
   async function load() {
     const { data, error } = await supabase.rpc('admin_status_overview');
@@ -295,15 +295,13 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
             <ul className="divide-y divide-slate-800">
               {o.incidents.map((i, idx) => {
                 const isOpen = openInc === idx;
-                const from = new Date(Math.floor(new Date(i.start).getTime() / 3600_000) * 3600_000);
-                const to = new Date(Math.min(Math.floor(new Date(i.last).getTime() / 3600_000) * 3600_000 + 3600_000, from.getTime() + 24 * 3600_000));
                 return (
                   <li key={idx}>
                     <button type="button" onClick={() => setOpenInc(isOpen ? null : idx)} aria-expanded={isOpen} className="w-full text-left p-3 flex items-center justify-between gap-3 text-sm hover:bg-slate-800/40">
                       <div><p className="font-medium">{i.label}</p><p className="text-xs text-slate-400">{new Date(i.start).toLocaleString()} to {new Date(i.last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
-                      <span className="text-rose-400 shrink-0">about {dur(i.checks)} · {isOpen ? 'hide' : 'details'}</span>
+                      <span className="text-rose-400 shrink-0">about {dur(i.checks)} · details</span>
                     </button>
-                    {isOpen && <div className="px-3 pb-3 space-y-2"><IncidentDetail k={i.key} start={i.start} last={i.last} onClose={() => setOpenInc(null)} /><button type="button" className="text-xs text-slate-400 underline" onClick={() => setHourView(hourView === idx ? null : idx)}>{hourView === idx ? 'Hide' : 'Show'} the full hour-by-hour view</button>{hourView === idx && <DetailPanel k={i.key} from={from} to={to} title={`${i.label} · ${new Date(i.start).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}`} onClose={() => setHourView(null)} />}</div>}
+                    {isOpen && <IncidentDetail k={i.key} start={i.start} last={i.last} onClose={() => setOpenInc(null)} />}
                   </li>
                 );
               })}

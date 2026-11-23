@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Card, EmptyState, ErrorText, Skeleton } from '../components/ui';
+import { Card, EmptyState, ErrorText, Modal, Skeleton } from '../components/ui';
 import { describeError } from '../lib/errors';
 
 interface Biz {
@@ -59,18 +59,19 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
                 : `Hi ${r.name}, we noticed you haven't used ShopOS for ${span(r.days_inactive)}. Is everything okay? Let us know if you need any help.`;
               return (
                 <li key={`${r.kind}-${r.id}`} className="py-3">
-                  <button type="button" onClick={() => setOpen(isOpen ? null : r.id)} aria-expanded={isOpen} className="w-full text-left flex items-start justify-between gap-3">
+                  <button type="button" onClick={() => setOpen(isOpen ? null : r.id)} aria-haspopup="dialog" className="w-full text-left flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block text-sm font-medium truncate">{r.name} <span className="text-[11px] font-normal text-slate-400">· {r.kind === 'shop' ? 'POS shop' : 'Booking'}{r.status ? ` · ${r.status}` : ''}</span></span>
                       <span className="block text-xs text-slate-400">Registered {d(r.created_at)} ({span(r.days_since_signup)} ago){r.package ? ` · ${r.package}` : ''}</span>
                     </span>
                     <span className="text-right shrink-0">
                       {r.never_used ? <span className="text-xs rounded-full px-2 py-0.5 bg-amber-500/15 text-amber-300">Never started</span> : <span className="text-xs rounded-full px-2 py-0.5 bg-rose-500/15 text-rose-300">Quiet {span(r.days_inactive)}</span>}
-                      <span className="block text-[11px] text-slate-500 mt-1">{isOpen ? 'hide' : 'details'}</span>
+                      <span className="block text-[11px] text-slate-500 mt-1">details</span>
                     </span>
                   </button>
                   {isOpen && (
-                    <div className="mt-2 rounded-lg border border-slate-700 p-3 text-xs space-y-2">
+                    <Modal title={r.name} subtitle={`${r.kind === 'shop' ? 'POS shop' : 'Booking business'}${r.status ? ` · ${r.status}` : ''} · registered ${d(r.created_at)}`} onClose={() => setOpen(null)}>
+                    <div className="text-xs space-y-3">
                       <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1">
                         <dt className="text-slate-400">Last activity</dt><dd>{r.last_activity ? `${new Date(r.last_activity).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${r.last_kind ? ` (${r.last_kind})` : ''}` : 'None recorded'}</dd>
                         <dt className="text-slate-400">{r.kind === 'shop' ? 'Last sale' : 'Last booking'}</dt><dd>{r.last_sale ? d(r.last_sale) : 'Never'}</dd>
@@ -87,6 +88,7 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
                         {r.email && <a className="btn-secondary text-xs" href={`mailto:${r.email}?subject=${encodeURIComponent('Can we help you with ShopOS?')}&body=${encodeURIComponent(msg)}`}>Email nudge</a>}
                       </div>
                     </div>
+                    </Modal>
                   )}
                 </li>
               );
