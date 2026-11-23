@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 
 interface Day { d: string; up: number | null; n: number }
 interface Hour { h: string; ms: number | null; up: number | null }
-interface Comp { public?: boolean; key: string; label: string; state: 'up' | 'down' | 'unknown'; uptime30: number | null; uptime7: number | null; days: Day[]; hours: Hour[] }
+interface Comp { since?: string | null; public?: boolean; key: string; label: string; state: 'up' | 'down' | 'unknown'; uptime30: number | null; uptime7: number | null; days: Day[]; hours: Hour[] }
 interface Incident { key: string; label: string; start: string; last: string; checks: number }
 interface Overview { incident_map?: Record<string, { start: string; last: string; n: number }[]>; enabled: boolean; message: string | null; components: Comp[]; incidents: Incident[]; at: string }
 
@@ -18,7 +18,19 @@ const STATE = { up: ['Operational', 'text-emerald-400', 'bg-emerald-500'], down:
 
 
 interface Det { label: string; from: string; to: string; checks: number; failed: number; up: number | null; first: string | null; last: string | null; incidents: { start: string; end: string; n: number }[]; rows: { t: string; n?: number; fail?: number; ok?: boolean; code?: number | null }[] }
-const incLen = (n: number) => { const m = n * 5; return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+/** "3 min", "1 hr 5 min", "1 day 3 hr" from a start time to now. */
+export function sinceText(iso?: string | null): string | null {
+  if (!iso) return null;
+  const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 1) return 'under 1 min';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return m % 60 ? `${h} hr ${m % 60} min` : `${h} hr`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d} day${d === 1 ? '' : 's'} ${h % 24} hr` : `${d} day${d === 1 ? '' : 's'}`;
+}
+
+const incLen = (n: number) => { const m = n * 5; if (m < 60) return `${m} min`; const h = Math.floor(m / 60); if (h < 24) return `${h} hr${m % 60 ? ` ${m % 60} min` : ''}`; const d = Math.floor(h / 24); return `${d} day${d === 1 ? '' : 's'}${h % 24 ? ` ${h % 24} hr` : ''}`; };
 const fmtTime = (t: string) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const fmtLong = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtHour = (h: string) => { const a = new Date(h), b = new Date(a.getTime() + 3600_000); return `${a.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}, ${fmtTime(a.toISOString())} – ${fmtTime(b.toISOString())}`; };
@@ -117,7 +129,7 @@ function HoursChart({ hours, compKey }: { hours: Hour[]; compKey: string }) {
   );
 }
 
-const dur = (n: number) => { const m = n * 5; return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const dur = incLen;
 
 /** Uptime and downtime of every part of ShopOS, and the switch for the public status page on the main website. view: uptime | log | page */
 export default function Status({ supabase, view }: { supabase: SupabaseClient; view: 'uptime' | 'log' | 'page' }) {
@@ -235,7 +247,7 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
   return (
     <div className="space-y-4">
       <div className={`rounded-lg p-3 text-sm flex items-center justify-between gap-3 flex-wrap ${down.length ? 'bg-rose-500/15 text-rose-400' : o.components.some((c) => c.state !== 'unknown') ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700/40 text-slate-300'}`}>
-        <span>{down.length ? `${down.map((d) => d.label).join(', ')} ${down.length === 1 ? 'is' : 'are'} down right now.` : o.components.some((c) => c.state !== 'unknown') ? 'Everything is operational.' : 'Collecting the first checks.'}</span>
+        <span>{down.length ? `${down.map((d) => `${d.label}${sinceText(d.since) ? ` (${sinceText(d.since)})` : ''}`).join(', ')} ${down.length === 1 ? 'is' : 'are'} down right now.` : o.components.some((c) => c.state !== 'unknown') ? 'Everything is operational.' : 'Collecting the first checks.'}</span>
         <span className="flex gap-2">
           <button className="btn-secondary text-xs inline-flex items-center gap-1" disabled={busy} onClick={() => void load()}><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
           <button className="btn-secondary text-xs inline-flex items-center gap-1" disabled={busy} onClick={() => void checkNow()}>{busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Check now</button>
@@ -249,7 +261,7 @@ export default function Status({ supabase, view }: { supabase: SupabaseClient; v
             <Card key={c.key} className="p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <p className="font-medium inline-flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${dot}`} />{c.label}</p>
-                <p className={`text-sm ${tcls}`}>{text}</p>
+                <p className={`text-sm text-right ${tcls}`}>{text}{c.state !== 'unknown' && sinceText(c.since) ? <span className="block text-[11px] opacity-80">{c.state === 'down' ? 'Down for' : 'Up for'} {sinceText(c.since)}</span> : null}</p>
               </div>
               <UptimeBars days={c.days} compKey={c.key} />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1 mb-3"><span>30 days ago</span><span>{c.uptime30 === null ? 'No data yet' : `${c.uptime30}% uptime (30 days)`}</span><span>Today</span></div>
