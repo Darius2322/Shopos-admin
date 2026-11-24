@@ -40,6 +40,8 @@ import Reviews from './pages/Reviews';
 import LastSeen from './pages/LastSeen';
 import Inactive from './pages/Inactive';
 import Promote from './pages/Promote';
+import Inbox from './pages/Inbox';
+import BusinessProfile from './pages/BusinessProfile';
 import Status from './pages/Status';
 import Analytics from './pages/Analytics';
 import AppsAndUpdates from './pages/AppsAndUpdates';
@@ -147,13 +149,14 @@ function Login({ supabase, onSignedIn }: { supabase: SupabaseClient; onSignedIn:
 
 const TAB_LABELS: Record<Tab, string> = {
   mpesa: 'Payments', assistant: 'Assistant', golive: 'Go live', website: 'Website', live: 'Live terminal', notifications: 'Notifications',
-  statusup: 'Status: Uptime', statuslog: 'Status: Downtime log', statuspage: 'Status: Public page', lastseen: 'Last seen', inactive: 'Inactive businesses', promote: 'Promote (adverts)', dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
+  statusup: 'Status: Uptime', statuslog: 'Status: Downtime log', statuspage: 'Status: Public page', lastseen: 'Last seen', inactive: 'Inactive businesses', promote: 'Promote (adverts)', inbox: 'New notifications', inboxpast: 'Past notifications', bizprofile: 'Business profile', dashboard: 'Dashboard', requests: 'Owner Requests', businesses: 'Businesses', create: 'New Business',
   bookings: 'Bookings', branches: 'Branches', features: 'Feature Requests', reviews: 'Reviews', permissions: 'Role Defaults', releases: 'App Updates', apps: 'Apps & Updates', analytics: 'Analytics', installers: 'Installers', monitor: 'Monitor', database: 'Database', packages: 'Packages', businesstypes: 'Business Types', softdelete: 'Soft Delete', audit: 'Audit Logs', support: 'Support', settings: 'Platform Settings',
 };
 
 function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>('dashboard'); useTabHistory(tab, setTab, 'dashboard');
   const [openBusinessId, setOpenBusinessId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const badges = useBadges(supabase);
@@ -187,6 +190,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
   function selectTab(key: Tab) {
     setTab(key);
     if (key !== 'businesses') setOpenBusinessId(null);
+    if (key === 'bizprofile') setProfileId(null);
   }
 
   return (
@@ -237,6 +241,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'features' && <FeatureRequests supabase={supabase} />}
             {tab === 'lastseen' && <LastSeen supabase={supabase} />}
             {tab === 'promote' && <Promote />}
+            {(tab === 'inbox' || tab === 'inboxpast') && <Inbox supabase={supabase} view={tab === 'inbox' ? 'new' : 'past'} onGo={(t, bid, kind) => { if (bid && (kind === 'signup' || kind === 'deletion')) { setProfileId(bid); setTab('bizprofile'); setOpenBusinessId(null); } else selectTab(t); }} />}
+            {tab === 'bizprofile' && <BusinessProfile supabase={supabase} initialId={profileId} onManage={openBusiness} />}
             {tab === 'inactive' && <Inactive supabase={supabase} onOpenBusiness={openBusiness} />}
             {tab === 'statusup' && <Status supabase={supabase} view="uptime" />}
             {tab === 'statuslog' && <Status supabase={supabase} view="log" />}

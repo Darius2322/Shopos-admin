@@ -5,7 +5,7 @@ import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'promote' | 'lastseen' | 'inactive' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live' | 'statusup' | 'statuslog' | 'statuspage';
+export type Tab = 'inbox' | 'inboxpast' | 'bizprofile' | 'promote' | 'lastseen' | 'inactive' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live' | 'statusup' | 'statuslog' | 'statuspage';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -29,7 +29,10 @@ export const TABS: [Tab, string, any][] = [
   ['apps', 'Apps & Updates', RefreshCw],
   ['database', 'Database', Database],
   ['assistant', 'Assistant', Bot],
-  ['notifications', 'Notifications', Bell],
+  ['inbox', 'New notifications', Bell],
+  ['inboxpast', 'Past notifications', Clock],
+  ['bizprofile', 'Business profile', Building2],
+  ['notifications', 'Push notifications', Bell],
   ['website', 'Website', Globe],
   ['promote', 'Promote (adverts)', Rocket],
   ['golive', 'Go live', Rocket],
@@ -53,12 +56,12 @@ interface SidebarProps {
 interface Group { id: string; label: string; icon: any; tabs: (Tab | Group)[] }
 const GROUPS: Group[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['dashboard', 'analytics'] },
-  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'inactive', 'lastseen', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
+  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'bizprofile', 'inactive', 'lastseen', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website', 'promote'] },
   { id: 'status', label: 'Status', icon: Activity, tabs: ['statusup', 'statuslog', 'statuspage'] },
-  { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
+  { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['inbox', 'inboxpast', 'notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
   { id: 'system', label: 'Platform & system', icon: Cpu, tabs: ['permissions', 'apps', { id: 'tools', label: 'Tools', icon: Terminal, tabs: ['database', 'assistant', { id: 'watch', label: 'Watching', icon: Radio, tabs: ['live', 'monitor', 'audit'] }] }, 'settings'] },
 ];
