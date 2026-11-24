@@ -5,7 +5,7 @@ import { BadgeDot, badgeFor, groupCount, setSoundOn, soundOn, chime, type Badges
 import { DownloadApp } from './DownloadApp';
 import { useBackClose } from '../lib/backStack';
 
-export type Tab = 'lastseen' | 'inactive' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live' | 'statusup' | 'statuslog' | 'statuspage';
+export type Tab = 'promote' | 'lastseen' | 'inactive' | 'notifications' | 'dashboard' | 'requests' | 'businesses' | 'create' | 'branches' | 'features' | 'audit' | 'support' | 'settings' | 'permissions' | 'reviews' | 'releases' | 'bookings' | 'apps' | 'analytics' | 'installers' | 'monitor' | 'database' | 'softdelete' | 'packages' | 'businesstypes' | 'mpesa' | 'assistant' | 'golive' | 'website' | 'live' | 'statusup' | 'statuslog' | 'statuspage';
 
 export const TABS: [Tab, string, any][] = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -31,6 +31,7 @@ export const TABS: [Tab, string, any][] = [
   ['assistant', 'Assistant', Bot],
   ['notifications', 'Notifications', Bell],
   ['website', 'Website', Globe],
+  ['promote', 'Promote (adverts)', Rocket],
   ['golive', 'Go live', Rocket],
   ['live', 'Live terminal', Radio],
   ['monitor', 'Monitor', Terminal],
@@ -55,7 +56,7 @@ const GROUPS: Group[] = [
   { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'inactive', 'lastseen', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
-  { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website'] },
+  { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website', 'promote'] },
   { id: 'status', label: 'Status', icon: Activity, tabs: ['statusup', 'statuslog', 'statuspage'] },
   { id: 'notify', label: 'Notifications', icon: Bell, tabs: ['notifications'] },
   { id: 'release', label: 'Go live', icon: Rocket, tabs: ['golive'] },
