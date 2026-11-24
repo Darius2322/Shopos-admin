@@ -11,11 +11,13 @@ interface Biz {
 const WINDOWS = [0, 1, 3, 7, 14, 30, 60, 90];
 const d = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–');
 const span = (n: number) => (n >= 60 ? `${Math.floor(n / 30)} months` : n === 1 ? '1 day' : `${n} days`);
+const LINK = (k: 'shop' | 'booking', src: string) => `https://www.shopos.co.ke/${k === 'booking' ? 'book' : ''}?utm_source=${src}&utm_medium=nudge`;
 const waNumber = (p: string | null) => { const x = (p ?? '').replace(/\D/g, ''); return x.startsWith('0') ? `254${x.slice(1)}` : x.startsWith('7') || x.startsWith('1') ? `254${x}` : x; };
 
 /** Businesses that registered but have gone quiet or never started. */
 export default function Inactive({ supabase, onOpenBusiness }: { supabase: SupabaseClient; onOpenBusiness: (id: string) => void }) {
   const [days, setDays] = useState(14); const [kind, setKind] = useState<'all' | 'shop' | 'booking'>('all'); const [only, setOnly] = useState<'all' | 'never' | 'quiet'>('all');
+  const [auto, setAuto] = useState<{ enabled: boolean; stages: number[]; sent_total: number; sent_7d: number } | null>(null); const [stagesTxt, setStagesTxt] = useState(''); const [autoErr, setAutoErr] = useState<string | null>(null); const [hist, setHist] = useState<Record<string, { count: number; last: string }>>({});
   const [rows, setRows] = useState<Biz[] | null>(null); const [err, setErr] = useState<string | null>(null); const [q, setQ] = useState(''); const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,6 +30,23 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
     return () => { off = true; };
   }, [supabase, days]);
 
+  const loadAuto = (en: boolean | null = null, st: number[] | null = null) => {
+    void supabase.rpc('admin_nudge_settings', { p_enabled: en, p_stages: st }).then(({ data, error }) => {
+      if (error) { setAutoErr(describeError(error, 'Could not load auto reminders')); return; }
+      setAutoErr(null); const a = data as { enabled: boolean; stages: number[]; sent_total: number; sent_7d: number }; setAuto(a); setStagesTxt(a.stages.join(', '));
+    });
+  };
+  useEffect(() => {
+    loadAuto();
+    void supabase.rpc('admin_nudge_history').then(({ data }) => { if (data) setHist(data as Record<string, { count: number; last: string }>); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
+  const saveStages = () => {
+    const st = stagesTxt.split(/[ ,]+/).map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x));
+    if (!st.length) { setAutoErr('Enter at least one number of days, e.g. 7, 21, 45'); return; }
+    loadAuto(null, st);
+  };
+
   const shown = useMemo(() => (rows ?? []).filter((r) => (kind === 'all' || r.kind === kind) && (only === 'all' || (only === 'never' ? r.never_used : !r.never_used)) && (!q.trim() || [r.name, r.email, r.phone].some((x) => (x ?? '').toLowerCase().includes(q.toLowerCase())))), [rows, kind, only, q]);
   const never = (rows ?? []).filter((r) => r.never_used).length;
 
@@ -37,6 +56,23 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
         <h1 className="text-xl font-semibold">Inactive businesses</h1>
         <p className="text-xs text-slate-400">Registered businesses with no activity (sales, sign-ins or bookings) for the chosen time. “Never started” means they registered but have never made a sale or booking.</p>
       </div>
+      <Card>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Automatic reminders</h2>
+            <p className="text-xs text-slate-400">Each morning (09:30 Nairobi) ShopOS sends a push notification and in-app message to inactive businesses, once per reminder day below, and tells you who was reminded. It stops as soon as they use the app again.</p>
+          </div>
+          <button disabled={!auto} onClick={() => loadAuto(!auto?.enabled)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${auto?.enabled ? 'bg-emerald-600 text-white' : 'border border-slate-600 text-slate-300'}`}>{auto ? (auto.enabled ? 'On' : 'Off') : '…'}</button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-400" htmlFor="nudge-days">Remind after (days quiet)</label>
+          <input id="nudge-days" value={stagesTxt} onChange={(e) => setStagesTxt(e.target.value)} className="w-40 rounded border border-slate-600 bg-transparent px-2 py-1 text-sm" placeholder="7, 21, 45" />
+          <button className="btn-secondary text-xs" onClick={saveStages}>Save</button>
+          {auto && <span className="text-xs text-slate-400">Sent: {auto.sent_7d} in the last 7 days · {auto.sent_total} in total</span>}
+        </div>
+        {autoErr && <ErrorText>{autoErr}</ErrorText>}
+        <p className="mt-2 text-[11px] text-slate-500">Reaches owners who have the app installed with notifications allowed. For others use the WhatsApp or email nudge buttons below, which now include the ShopOS link.</p>
+      </Card>
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-xs text-slate-400">Quiet for at least</span>
         {WINDOWS.map((w) => <button key={w} onClick={() => setDays(w)} className={`rounded-full border px-3 py-1 text-sm ${days === w ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-600 text-slate-300'}`}>{w === 0 ? 'Any' : w === 1 ? '1 day' : `${w} days`}</button>)}
@@ -56,8 +92,8 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
             {shown.map((r) => {
               const isOpen = open === r.id;
               const msg = r.never_used
-                ? `Hi ${r.name}, you registered on ShopOS ${span(r.days_since_signup)} ago but haven't started yet. Can I help you get set up? It only takes a few minutes.`
-                : `Hi ${r.name}, we noticed you haven't used ShopOS for ${span(r.days_inactive)}. Is everything okay? Let us know if you need any help.`;
+                ? `Hi ${r.name}, you registered on ShopOS ${span(r.days_since_signup)} ago but haven't started yet. Can I help you get set up? It only takes a few minutes. ${LINK(r.kind, 'whatsapp')}`
+                : `Hi ${r.name}, we noticed you haven't used ShopOS for ${span(r.days_inactive)}. Is everything okay? Let us know if you need any help. ${LINK(r.kind, 'whatsapp')}`;
               return (
                 <li key={`${r.kind}-${r.id}`} className="py-3">
                   <button type="button" onClick={() => setOpen(isOpen ? null : r.id)} aria-haspopup="dialog" className="w-full text-left flex items-start justify-between gap-3">
@@ -80,13 +116,14 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
                         <dt className="text-slate-400">{r.kind === 'shop' ? 'Sales / products / staff' : 'Bookings'}</dt><dd>{r.kind === 'shop' ? `${r.sales} / ${r.products} / ${r.staff}` : r.sales}</dd>
                         {r.kind === 'shop' && <><dt className="text-slate-400">Setup</dt><dd>{r.onboarding_done ? 'Finished' : `Not finished${r.onboarding_step ? ` (step ${r.onboarding_step})` : ''}`}</dd></>}
                         {r.activation_expires_at && <><dt className="text-slate-400">Access until</dt><dd>{d(r.activation_expires_at)}</dd></>}
+                        <dt className="text-slate-400">Auto reminders</dt><dd>{hist[r.id] ? `${hist[r.id].count} sent, last ${d(hist[r.id].last)}` : 'None yet'}</dd>
                         <dt className="text-slate-400">Contact</dt><dd className="break-all">{[r.email, r.phone].filter(Boolean).join(' · ') || 'No contact on file'}</dd>
                       </dl>
                       <div className="flex flex-wrap gap-2 pt-1">
                         {r.kind === 'shop' && <button className="btn-secondary text-xs" onClick={() => onOpenBusiness(r.id)}>Open business</button>}
                         {r.phone && <a className="btn-secondary text-xs" href={`tel:${r.phone}`}>Call</a>}
                         {r.phone && <a className="btn-secondary text-xs" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${waNumber(r.phone)}?text=${encodeURIComponent(msg)}`}>WhatsApp nudge</a>}
-                        {r.email && <a className="btn-secondary text-xs" href={`mailto:${r.email}?subject=${encodeURIComponent('Can we help you with ShopOS?')}&body=${encodeURIComponent(msg)}`}>Email nudge</a>}
+                        {r.email && <a className="btn-secondary text-xs" href={`mailto:${r.email}?subject=${encodeURIComponent('Can we help you with ShopOS?')}&body=${encodeURIComponent(msg.replace('utm_source=whatsapp', 'utm_source=email'))}`}>Email nudge</a>}
                       </div>
                     </div>
                     </Modal>
