@@ -12,12 +12,15 @@ const WINDOWS = [0, 1, 3, 7, 14, 30, 60, 90];
 const d = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–');
 const span = (n: number) => (n >= 60 ? `${Math.floor(n / 30)} months` : n === 1 ? '1 day' : `${n} days`);
 const LINK = (k: 'shop' | 'booking', src: string) => `https://www.shopos.co.ke/${k === 'booking' ? 'book' : ''}?utm_source=${src}&utm_medium=nudge`;
+const DEF_QUIET = "Hi {name},\n\nwe noticed you haven't used ShopOS for {days}. Is everything okay? Let us know if you need any help.\nPress the link and sign in to your account 👇👇 {link}";
+const DEF_NEVER = "Hi {name},\n\nyou registered on ShopOS {days} ago but haven't started yet. Can we help you get set up? It only takes a few minutes.\nPress the link and sign in to your account 👇👇 {link}";
+const fill = (t: string, name: string, days: string, link: string) => t.split('{name}').join(name).split('{days}').join(days).split('{link}').join(link);
 const waNumber = (p: string | null) => { const x = (p ?? '').replace(/\D/g, ''); return x.startsWith('0') ? `254${x.slice(1)}` : x.startsWith('7') || x.startsWith('1') ? `254${x}` : x; };
 
 /** Businesses that registered but have gone quiet or never started. */
 export default function Inactive({ supabase, onOpenBusiness }: { supabase: SupabaseClient; onOpenBusiness: (id: string) => void }) {
   const [days, setDays] = useState(14); const [kind, setKind] = useState<'all' | 'shop' | 'booking'>('all'); const [only, setOnly] = useState<'all' | 'never' | 'quiet'>('all');
-  const [auto, setAuto] = useState<{ enabled: boolean; stages: number[]; sent_total: number; sent_7d: number } | null>(null); const [stagesTxt, setStagesTxt] = useState(''); const [autoErr, setAutoErr] = useState<string | null>(null); const [hist, setHist] = useState<Record<string, { count: number; last: string }>>({});
+  const [auto, setAuto] = useState<{ enabled: boolean; stages: number[]; sent_total: number; sent_7d: number; tpl_quiet: string; tpl_never: string } | null>(null); const [tplQ, setTplQ] = useState(''); const [tplN, setTplN] = useState(''); const [saved, setSaved] = useState(false); const [stagesTxt, setStagesTxt] = useState(''); const [autoErr, setAutoErr] = useState<string | null>(null); const [hist, setHist] = useState<Record<string, { count: number; last: string }>>({});
   const [rows, setRows] = useState<Biz[] | null>(null); const [err, setErr] = useState<string | null>(null); const [q, setQ] = useState(''); const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,10 +33,10 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
     return () => { off = true; };
   }, [supabase, days]);
 
-  const loadAuto = (en: boolean | null = null, st: number[] | null = null) => {
-    void supabase.rpc('admin_nudge_settings', { p_enabled: en, p_stages: st }).then(({ data, error }) => {
+  const loadAuto = (en: boolean | null = null, st: number[] | null = null, tq: string | null = null, tn: string | null = null) => {
+    void supabase.rpc('admin_nudge_settings', { p_enabled: en, p_stages: st, p_tpl_quiet: tq, p_tpl_never: tn }).then(({ data, error }) => {
       if (error) { setAutoErr(describeError(error, 'Could not load auto reminders')); return; }
-      setAutoErr(null); const a = data as { enabled: boolean; stages: number[]; sent_total: number; sent_7d: number }; setAuto(a); setStagesTxt(a.stages.join(', '));
+      setAutoErr(null); const a = data as { enabled: boolean; stages: number[]; sent_total: number; sent_7d: number; tpl_quiet: string; tpl_never: string }; setAuto(a); setStagesTxt(a.stages.join(', ')); setTplQ(a.tpl_quiet); setTplN(a.tpl_never);
     });
   };
   useEffect(() => {
@@ -41,6 +44,7 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
     void supabase.rpc('admin_nudge_history').then(({ data }) => { if (data) setHist(data as Record<string, { count: number; last: string }>); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
+  const saveTpl = () => { loadAuto(null, null, tplQ, tplN); setSaved(true); setTimeout(() => setSaved(false), 1500); };
   const saveStages = () => {
     const st = stagesTxt.split(/[ ,]+/).map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x));
     if (!st.length) { setAutoErr('Enter at least one number of days, e.g. 7, 21, 45'); return; }
@@ -70,6 +74,13 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
           <button className="btn-secondary text-xs" onClick={saveStages}>Save</button>
           {auto && <span className="text-xs text-slate-400">Sent: {auto.sent_7d} in the last 7 days · {auto.sent_total} in total</span>}
         </div>
+        <div className="mt-3 space-y-2">
+          <h3 className="text-xs font-semibold text-slate-300">WhatsApp / email message (saved)</h3>
+          <p className="text-[11px] text-slate-500">Each business gets its own message built from these. Use {'{name}'}, {'{days}'} and {'{link}'}; they are filled in for every business. Then just tap “Share on WhatsApp” on a business.</p>
+          <label className="block text-[11px] text-slate-400">Quiet businesses<textarea rows={5} value={tplQ} onChange={(e) => setTplQ(e.target.value)} className="mt-1 w-full rounded border border-slate-600 bg-transparent px-2 py-1 text-sm" /></label>
+          <label className="block text-[11px] text-slate-400">Never started<textarea rows={5} value={tplN} onChange={(e) => setTplN(e.target.value)} className="mt-1 w-full rounded border border-slate-600 bg-transparent px-2 py-1 text-sm" /></label>
+          <button className="btn-secondary text-xs" onClick={saveTpl}>{saved ? 'Saved ✓' : 'Save messages'}</button>
+        </div>
         {autoErr && <ErrorText>{autoErr}</ErrorText>}
         <p className="mt-2 text-[11px] text-slate-500">Reaches owners who have the app installed with notifications allowed. For others use the WhatsApp or email nudge buttons below, which now include the ShopOS link.</p>
       </Card>
@@ -91,9 +102,7 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
           <ul className="divide-y divide-slate-700/60">
             {shown.map((r) => {
               const isOpen = open === r.id;
-              const msg = r.never_used
-                ? `Hi ${r.name}, you registered on ShopOS ${span(r.days_since_signup)} ago but haven't started yet. Can I help you get set up? It only takes a few minutes. ${LINK(r.kind, 'whatsapp')}`
-                : `Hi ${r.name}, we noticed you haven't used ShopOS for ${span(r.days_inactive)}. Is everything okay? Let us know if you need any help. ${LINK(r.kind, 'whatsapp')}`;
+              const msg = fill(r.never_used ? (auto?.tpl_never ?? DEF_NEVER) : (auto?.tpl_quiet ?? DEF_QUIET), r.name, span(r.never_used ? r.days_since_signup : r.days_inactive), LINK(r.kind, 'whatsapp'));
               return (
                 <li key={`${r.kind}-${r.id}`} className="py-3">
                   <button type="button" onClick={() => setOpen(isOpen ? null : r.id)} aria-haspopup="dialog" className="w-full text-left flex items-start justify-between gap-3">
@@ -122,7 +131,7 @@ export default function Inactive({ supabase, onOpenBusiness }: { supabase: Supab
                       <div className="flex flex-wrap gap-2 pt-1">
                         {r.kind === 'shop' && <button className="btn-secondary text-xs" onClick={() => onOpenBusiness(r.id)}>Open business</button>}
                         {r.phone && <a className="btn-secondary text-xs" href={`tel:${r.phone}`}>Call</a>}
-                        {r.phone && <a className="btn-secondary text-xs" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${waNumber(r.phone)}?text=${encodeURIComponent(msg)}`}>WhatsApp nudge</a>}
+                        {r.phone && <a className="btn-secondary text-xs" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${waNumber(r.phone)}?text=${encodeURIComponent(msg)}`}>Share on WhatsApp</a>}
                         {r.email && <a className="btn-secondary text-xs" href={`mailto:${r.email}?subject=${encodeURIComponent('Can we help you with ShopOS?')}&body=${encodeURIComponent(msg.replace('utm_source=whatsapp', 'utm_source=email'))}`}>Email nudge</a>}
                       </div>
                     </div>
