@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Phone, MessageCircle, Mail, Settings2, Copy, ArrowLeft, Search, ChevronRight } from 'lucide-react';
-import { Card, EmptyState, ErrorText, Skeleton, StatusBadge } from '../components/ui';
+import { Phone, MessageCircle, Mail, Copy } from 'lucide-react';
+import { Card, ErrorText, Skeleton, StatusBadge } from '../components/ui';
 import { describeError } from '../lib/errors';
 
 interface Biz { id: string; name: string; logo_url: string | null; phone: string | null; email: string | null; address: string | null; status: string; created_at: string; last_active_at: string | null; business_type: string | null; currency: string | null; slug: string | null; tax_pin: string | null; paybill_number: string | null; paybill_account: string | null; till_number: string | null; send_till_number: string | null; activation_expires_at: string | null; branches_enabled: boolean | null; onboarding_completed: boolean | null; deleted_at: string | null; pause_reason: string | null }
@@ -30,42 +30,22 @@ export function Avatar({ name, url, size = 56 }: { name: string; url?: string | 
 
 const Row = ({ k, v }: { k: string; v: React.ReactNode }) => <><dt className="text-slate-400">{k}</dt><dd className="break-words">{v ?? '—'}</dd></>;
 
-/** One business, everything about it: avatar, quick actions and sub-menus. Pick a business, or arrive from a notification. */
-export default function BusinessProfile({ supabase, initialId, onManage }: { supabase: SupabaseClient; initialId?: string | null; onManage: (id: string) => void }) {
-  const [list, setList] = useState<Biz[] | null>(null); const [q, setQ] = useState(''); const [id, setId] = useState<string | null>(initialId ?? null);
+/** One business, everything about it: avatar, quick actions and sub-menus. Shown as the "Profile" tab inside each business. */
+export default function BusinessProfile({ supabase, businessId, onOpenTab }: { supabase: SupabaseClient; businessId: string; onOpenTab?: (tab: string) => void }) {
+  const id = businessId;
+  const [b, setB] = useState<Biz | null>(null);
   const [prof, setProf] = useState<Prof | null>(null); const [err, setErr] = useState<string | null>(null); const [sub, setSub] = useState<Sub>('overview'); const [copied, setCopied] = useState(false);
-  useEffect(() => { setId(initialId ?? null); }, [initialId]);
-  useEffect(() => { void supabase.from('businesses').select('*').is('deleted_at', null).order('created_at', { ascending: false }).then(({ data, error }) => { if (error) setErr(describeError(error, 'Could not load businesses')); setList((data ?? []) as Biz[]); }); }, [supabase]);
   useEffect(() => {
-    if (!id) return; let off = false; setProf(null); setErr(null); setSub('overview');
+    let off = false; setB(null); setProf(null); setErr(null); setSub('overview');
+    void supabase.from('businesses').select('*').eq('id', id).single().then(({ data, error }) => { if (off) return; if (error) setErr(describeError(error, 'Could not load this business')); else setB(data as Biz); });
     void supabase.rpc('admin_business_profile', { p_business_id: id }).then(({ data, error }) => { if (off) return; if (error) setErr(describeError(error, 'Could not load this business')); else setProf(data as Prof); });
     return () => { off = true; };
   }, [supabase, id]);
-
-  const b = useMemo(() => (list ?? []).find((x) => x.id === id) ?? null, [list, id]);
-  const results = useMemo(() => (list ?? []).filter((x) => !q.trim() || [x.name, x.email, x.phone].some((v) => (v ?? '').toLowerCase().includes(q.toLowerCase()))), [list, q]);
   const money = (n: number) => `${b?.currency || 'KES'} ${Math.round(n).toLocaleString('en-KE')}`;
-
-  if (!id) {
-    return (
-      <div className="space-y-4">
-        <div><h1 className="text-xl font-semibold">Business profile</h1><p className="text-xs text-slate-400">Pick a business to see everything about it in one place.</p></div>
-        <div className="relative"><Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" /><input className="w-full rounded-xl border border-slate-600 bg-transparent pl-9 pr-3 py-2 text-sm" placeholder="Search name, email or phone" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search businesses" /></div>
-        {err && <ErrorText>{err}</ErrorText>}
-        {list === null ? <Skeleton /> : results.length === 0 ? <EmptyState message="No businesses found." /> : (
-          <Card className="p-0"><ul className="divide-y divide-slate-700/60">{results.map((x) => (
-            <li key={x.id}><button className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-slate-800/60" onClick={() => setId(x.id)}>
-              <Avatar name={x.name} url={x.logo_url} size={40} /><span className="min-w-0 flex-1"><span className="block text-sm font-medium truncate">{x.name}</span><span className="block text-xs text-slate-400 truncate">{x.business_type ?? 'Shop'} · {x.phone ?? x.email ?? 'no contact'}</span></span><ChevronRight className="w-4 h-4 text-slate-500" />
-            </button></li>))}</ul></Card>
-        )}
-      </div>
-    );
-  }
 
   const msg = b ? `Hi ${b.name},\n\n` : '';
   return (
     <div className="space-y-4">
-      <button className="text-xs text-slate-400 inline-flex items-center gap-1 hover:text-slate-200" onClick={() => setId(null)}><ArrowLeft className="w-3.5 h-3.5" /> All businesses</button>
       {err && <ErrorText>{err}</ErrorText>}
       {!b ? <Skeleton /> : (
         <>
@@ -73,7 +53,7 @@ export default function BusinessProfile({ supabase, initialId, onManage }: { sup
             <div className="flex items-center gap-3">
               <Avatar name={b.name} url={b.logo_url} />
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-semibold truncate">{b.name}</h1>
+                <h2 className="text-lg font-semibold truncate">{b.name}</h2>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400"><StatusBadge status={b.status} /><span>{b.business_type ?? 'Shop'}</span><span>· joined {dOnly(b.created_at)}</span></div>
               </div>
             </div>
@@ -81,7 +61,6 @@ export default function BusinessProfile({ supabase, initialId, onManage }: { sup
               {b.phone && <a className="btn-secondary text-xs inline-flex items-center gap-1" href={`tel:${b.phone}`}><Phone className="w-3.5 h-3.5" /> Call</a>}
               {b.phone && <a className="btn-secondary text-xs inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${waNumber(b.phone)}?text=${encodeURIComponent(msg)}`}><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</a>}
               {b.email && <a className="btn-secondary text-xs inline-flex items-center gap-1" href={`mailto:${b.email}`}><Mail className="w-3.5 h-3.5" /> Email</a>}
-              <button className="btn-secondary text-xs inline-flex items-center gap-1" onClick={() => onManage(b.id)}><Settings2 className="w-3.5 h-3.5" /> Manage (access, plan, suspend)</button>
               <button className="btn-secondary text-xs inline-flex items-center gap-1" onClick={() => { void navigator.clipboard?.writeText(b.id).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => undefined); }}><Copy className="w-3.5 h-3.5" /> {copied ? 'Copied ✓' : 'Copy ID'}</button>
             </div>
           </Card>

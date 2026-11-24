@@ -12,8 +12,7 @@ export const TABS: [Tab, string, any][] = [
   ['requests', 'Owner Requests', Users],
   ['analytics', 'Analytics', BarChart3],
   ['businesses', 'Businesses', Building2],
-  ['lastseen', 'Last seen', Clock],
-  ['inactive', 'Inactive businesses', Clock],
+  ['inactive', 'Last seen & inactive', Clock],
   ['statusup', 'Uptime', Activity],
   ['statuslog', 'Downtime log', ScrollText],
   ['statuspage', 'Public status page', Globe],
@@ -31,7 +30,6 @@ export const TABS: [Tab, string, any][] = [
   ['assistant', 'Assistant', Bot],
   ['inbox', 'New notifications', Bell],
   ['inboxpast', 'Past notifications', Clock],
-  ['bizprofile', 'Business profile', Building2],
   ['notifications', 'Push notifications', Bell],
   ['website', 'Website', Globe],
   ['promote', 'Promote (adverts)', Rocket],
@@ -56,7 +54,7 @@ interface SidebarProps {
 interface Group { id: string; label: string; icon: any; tabs: (Tab | Group)[] }
 const GROUPS: Group[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['dashboard', 'analytics'] },
-  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'bizprofile', 'inactive', 'lastseen', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
+  { id: 'customers', label: 'Businesses & people', icon: Briefcase, tabs: ['requests', 'businesses', 'inactive', { id: 'bookapp', label: 'Booking app', icon: CalendarCheck, tabs: ['bookings', 'businesstypes'] }, 'branches', 'softdelete'] },
   { id: 'money', label: 'Money & plans', icon: Wallet, tabs: ['mpesa', 'packages'] },
   { id: 'help', label: 'Feedback & support', icon: Headphones, tabs: ['support', 'features', 'reviews'] },
   { id: 'site', label: 'Marketing website', icon: Globe, tabs: ['website', 'promote'] },

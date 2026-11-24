@@ -7,11 +7,13 @@ import { formatExpiry } from '../components/DurationSelect';
 import { BusinessPlanPanel } from './Packages';
 import { BusinessRules } from '../components/BusinessRules';
 import { PackagePicker, PickerValue, applyPick, pickMonths } from '../components/PackagePicker';
+import BusinessProfile from './BusinessProfile';
 import { Branch, Business, BusinessStatus, OtpStatusRow, Profile } from '../lib/types';
 import { describeError } from '../lib/errors';
 import { supabaseUrl } from '../lib/supabase';
 
 const TABS = [
+  { id: 'profile', label: 'Profile' },
   { id: 'overview', label: 'Overview' },
   { id: 'activity', label: 'Activity' },
   { id: 'users', label: 'Users' },
@@ -29,7 +31,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
   const [usage, setUsage] = useState<Record<string, number> | null>(null);
   const [activity, setActivity] = useState<{ occurred_at: string; kind: string; detail: string | null; actor_name: string | null; was_offline: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabId>('overview');
+  const [tab, setTab] = useState<TabId>('profile');
   const [consents, setConsents] = useState<{ full_name: string | null; email: string | null; document_version: string; context: string; accepted_at: string; user_agent: string | null }[]>([]);
   const [deletions, setDeletions] = useState<{ id: string; action: string; scope: string; email: string | null; reason: string | null; created_at: string }[]>([]);
   const [restoring, setRestoring] = useState(false);
@@ -228,6 +230,7 @@ export default function BusinessDetail({ supabase, businessId, onBack }: { supab
         ))}
       </div>
 
+      {tab === 'profile' && <BusinessProfile supabase={supabase} businessId={businessId} />}
       {tab === 'overview' && (<Card className="section-anchor" id="section-overview">
         <div className="flex items-start justify-between gap-3">
           <div>
