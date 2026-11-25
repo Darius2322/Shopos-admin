@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { drawPoster, generatePosters, type PosterSpec, type Product } from '../lib/posters';
 import { Card } from '../components/ui';
 
 const BASE = 'https://www.shopos.co.ke';
@@ -6,6 +7,38 @@ const ADS = [
   { id: 'pos', title: 'POS (shop) advert', link: `${BASE}/?utm_source=whatsapp&utm_medium=ad`, text: '🛒 *Run your shop from your phone with ShopOS*\nSales, stock, M-Pesa, debts, receipts and daily reports, even offline.' },
   { id: 'booking', title: 'Booking advert', link: `${BASE}/book?utm_source=whatsapp&utm_medium=ad`, text: '📅 *Let customers book you online 24/7*\nSalons, barbers, clinics and studios: get your own booking link, reminders and M-Pesa deposits. Set up in minutes.' },
 ];
+
+function Thumb({ spec, link, selected, onPick }: { spec: PosterSpec; link: string; selected: boolean; onPick: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => { if (ref.current) drawPoster(ref.current, spec, link, 360); }, [spec, link]);
+  return <button onClick={onPick} aria-label={`Choose design: ${spec.headline}`} aria-pressed={selected} className={`rounded-xl overflow-hidden border-2 ${selected ? 'border-emerald-500' : 'border-transparent'}`}><canvas ref={ref} className="w-full h-auto block" /></button>;
+}
+
+function PosterStudio({ source }: { source: string }) {
+  const [product, setProduct] = useState<Product>('pos'); const [set, setSet] = useState<PosterSpec[]>(() => generatePosters('pos')); const [sel, setSel] = useState<PosterSpec | null>(null); const [note, setNote] = useState<string | null>(null);
+  const link = product === 'pos' ? 'shopos.co.ke' : 'shopos.co.ke/book';
+  const full = `${BASE}${product === 'pos' ? '/' : '/book'}?utm_source=${source}&utm_medium=ad`;
+  const regen = (p: Product = product) => { setSet(generatePosters(p)); setSel(null); };
+  const blob = () => new Promise<Blob | null>((res) => { const c = document.createElement('canvas'); if (!sel) return res(null); drawPoster(c, sel, link, 1080); c.toBlob((b) => res(b), 'image/png'); });
+  const download = async () => { const b = await blob(); if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `shopos-${product}-advert.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  const share = async () => {
+    const b = await blob(); if (!b) return; const file = new File([b], `shopos-${product}-advert.png`, { type: 'image/png' });
+    try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text: full }); return; } } catch { /* cancelled */ }
+    setNote('Sharing pictures is not supported here. Use Download, then add it to your WhatsApp Status.'); setTimeout(() => setNote(null), 4000);
+  };
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold">Advert pictures</h2>
+      <p className="text-xs text-slate-400">Press Generate for a new set of designs, tap the one you like, then share it to WhatsApp or download it. Sized for WhatsApp Status.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {([['pos', 'POS (shops)'], ['booking', 'Booking']] as const).map(([k, l]) => <button key={k} onClick={() => { setProduct(k); regen(k); }} className={`rounded-full border px-3 py-1 text-xs ${product === k ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-600 text-slate-300'}`}>{l}</button>)}
+        <button className="btn-secondary text-xs" onClick={() => regen()}>Generate new designs</button>
+      </div>
+      <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">{set.map((p) => <Thumb key={p.id} spec={p} link={link} selected={sel?.id === p.id} onPick={() => setSel(p)} />)}</div>
+      {sel && <div className="mt-3 flex flex-wrap gap-2 items-center"><button className="btn-secondary text-xs" onClick={() => void share()}>Share picture</button><button className="btn-secondary text-xs" onClick={() => void download()}>Download</button><button className="btn-secondary text-xs" onClick={() => void navigator.clipboard?.writeText(full)}>Copy link</button>{note && <span className="text-xs text-amber-400">{note}</span>}</div>}
+    </Card>
+  );
+}
 
 /** Ready-to-post advert links and text for WhatsApp Status and chats. */
 export default function Promote() {
@@ -26,6 +59,7 @@ export default function Promote() {
         <input id="src" value={custom} onChange={(e) => setCustom(e.target.value)} className="w-32 rounded border border-slate-600 bg-transparent px-2 py-1 text-sm" />
         <span>e.g. whatsapp, facebook, flyer</span>
       </div>
+      <PosterStudio source={src} />
       {ADS.map((a) => {
         const link = a.link.replace('utm_source=whatsapp', `utm_source=${src}`);
         const full = `${a.text}\n👉 ${link}`;

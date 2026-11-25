@@ -81,3 +81,19 @@ html.light .term .text-red-400 { color:#f08a76; }
 html.light .term .text-slate-100, html.light .term .text-slate-200, html.light .term .text-white { color:#e9ede9; }
 html.light .text-slate-100, html.light .text-slate-200 { color: var(--color-ink); }
 html.light .hover\:bg-slate-700:hover { background-color: #cfd8d2; }
+
+/* Scrolling menus: fade on the side with more, thin visible scroll bar (see lib/scrollHints.ts). */
+[data-sx="1"] {
+  scrollbar-width: thin; scrollbar-color: rgb(100 116 139 / .55) transparent;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--fl, 0) * 36px), #000 calc(100% - var(--fr, 0) * 36px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--fl, 0) * 36px), #000 calc(100% - var(--fr, 0) * 36px), transparent 100%);
+}
+[data-sy="1"] {
+  scrollbar-width: thin; scrollbar-color: rgb(100 116 139 / .55) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 calc(var(--ft, 0) * 28px), #000 calc(100% - var(--fb, 0) * 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 calc(var(--ft, 0) * 28px), #000 calc(100% - var(--fb, 0) * 28px), transparent 100%);
+}
+[data-sx="1"]::-webkit-scrollbar { height: 4px; }
+[data-sy="1"]::-webkit-scrollbar { width: 4px; }
+[data-sx="1"]::-webkit-scrollbar-thumb, [data-sy="1"]::-webkit-scrollbar-thumb { background: rgb(100 116 139 / .55); border-radius: 999px; }
+@media (prefers-reduced-motion: no-preference) { [data-sx="1"] { scroll-behavior: smooth; } }

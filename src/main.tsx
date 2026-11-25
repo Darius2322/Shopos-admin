@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { initScrollHints } from './lib/scrollHints';
 import { DialogHost } from './components/DialogHost';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { ApkSaved } from './components/ApkSaved';
@@ -19,3 +20,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => undefined); });
 }
+initScrollHints();
