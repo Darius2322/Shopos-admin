@@ -45,8 +45,15 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
 }
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
+let logoP: Promise<HTMLImageElement | null> | null = null;
+/** The ShopOS emblem, loaded once. Resolves to null if it can't be loaded so posters still draw. */
+export function loadLogo(): Promise<HTMLImageElement | null> {
+  logoP ??= new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = '/logo-emblem.png'; });
+  return logoP;
+}
+
 /** Draws a 9:16 poster (WhatsApp Status size). `link` is the short text shown at the bottom. */
-export function drawPoster(canvas: HTMLCanvasElement, s: PosterSpec, link: string, width = 1080) {
+export function drawPoster(canvas: HTMLCanvasElement, s: PosterSpec, link: string, width = 1080, logo: HTMLImageElement | null = null) {
   const W = width, H = Math.round(width * 16 / 9), k = W / 1080; canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d'); if (!ctx) return;
   const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, s.pal.bg1); g.addColorStop(1, s.pal.bg2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -56,8 +63,11 @@ export function drawPoster(canvas: HTMLCanvasElement, s: PosterSpec, link: strin
   const align: CanvasTextAlign = s.layout === 'left' ? 'left' : 'center'; const px = s.layout === 'left' ? 90 * k : W / 2; const maxW = W - 180 * k;
   ctx.textAlign = align; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = s.pal.ink;
   // wordmark
-  ctx.font = `800 ${64 * k}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`; ctx.fillText('ShopOS', px, 170 * k);
-  ctx.fillStyle = s.pal.accent; ctx.fillRect(align === 'left' ? px : px - 40 * k, 196 * k, 80 * k, 8 * k);
+  ctx.font = `800 ${72 * k}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  const L = logo ? 150 * k : 0; const gap = logo ? 28 * k : 0; const tw = ctx.measureText('ShopOS').width; const rowW = L + gap + tw;
+  const rx = align === 'left' ? px : px - rowW / 2; const ry = 100 * k;
+  if (logo) { ctx.save(); rr(ctx, rx, ry, L, L, 34 * k); ctx.clip(); ctx.drawImage(logo, rx, ry, L, L); ctx.restore(); }
+  ctx.textAlign = 'left'; ctx.fillText('ShopOS', rx + L + gap, ry + L / 2 + 25 * k); ctx.textAlign = align;
   // headline
   ctx.fillStyle = s.pal.ink; ctx.font = `800 ${112 * k}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
   let y = H * 0.30; for (const line of wrap(ctx, s.headline, maxW)) { ctx.fillText(line, px, y); y += 128 * k; }

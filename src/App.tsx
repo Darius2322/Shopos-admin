@@ -40,6 +40,7 @@ import Reviews from './pages/Reviews';
 import LastSeen from './pages/LastSeen';
 import Inactive from './pages/Inactive';
 import ActivityTabs from './pages/ActivityTabs';
+import AutoPause from './pages/AutoPause';
 import Promote from './pages/Promote';
 import Inbox from './pages/Inbox';
 import Status from './pages/Status';
@@ -238,8 +239,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'branches' && <Branches supabase={supabase} onOpenBusiness={openBusiness} />}
             {tab === 'features' && <FeatureRequests supabase={supabase} />}
             {tab === 'promote' && <Promote />}
-            {(tab === 'inbox' || tab === 'inboxpast') && <Inbox supabase={supabase} view={tab === 'inbox' ? 'new' : 'past'} onGo={(t, bid, kind) => { if (bid && (kind === 'signup' || kind === 'deletion')) openBusiness(bid); else selectTab(t); }} />}
-            {(tab === 'inactive' || tab === 'lastseen') && <ActivityTabs inactive={<Inactive supabase={supabase} onOpenBusiness={openBusiness} />} lastSeen={<LastSeen supabase={supabase} />} />}
+            {(tab === 'inbox' || tab === 'inboxpast') && <Inbox supabase={supabase} view={tab === 'inbox' ? 'new' : 'past'} onGo={(t, bid, kind) => { if (bid && (kind === 'signup' || kind === 'deletion')) openBusiness(bid); else { if (kind === 'reactivation') (window as unknown as { __adminPill?: string }).__adminPill = 'pause'; selectTab(t); } }} />}
+            {(tab === 'inactive' || tab === 'lastseen') && <ActivityTabs inactive={<Inactive supabase={supabase} onOpenBusiness={openBusiness} />} lastSeen={<LastSeen supabase={supabase} />} autoPause={<AutoPause supabase={supabase} />} />}
             {tab === 'statusup' && <Status supabase={supabase} view="uptime" />}
             {tab === 'statuslog' && <Status supabase={supabase} view="log" />}
             {tab === 'statuspage' && <Status supabase={supabase} view="page" />}
