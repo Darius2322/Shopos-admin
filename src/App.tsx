@@ -228,7 +228,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overscroll-contain p-5">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-8">
           <div key={refreshKey} className={`mx-auto ${tab === 'monitor' || tab === 'analytics' || tab === 'golive' || tab === 'notifications' ? 'max-w-5xl' : 'max-w-3xl'}`}>
             {tab === 'dashboard' && <Merged id="dashboard" shop={<Dashboard supabase={supabase} onOpenBusiness={openBusiness} onGo={(t) => selectTab(t)} />} booking={[{ id: 'o', label: 'Overview', node: <BookingInsights supabase={supabase} view="overview" /> }, { id: 'a', label: 'Activity', node: <BookingAdmin supabase={supabase} view="activity" /> }]} />}
             {tab === 'requests' && <Merged id="requests" shop={<OwnerRequests supabase={supabase} />} booking={[{ id: 'apps', label: 'Applications', node: <Bookings supabase={supabase} view="apps" /> }]} />}

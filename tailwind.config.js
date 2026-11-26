@@ -15,7 +15,7 @@ export default {
         slate: { 300: 'var(--color-slate-300)', 600: 'var(--color-slate-600)', 900: 'var(--color-slate-900)', 400: 'var(--color-slate-400)', 500: 'var(--color-slate-500)', 700: 'var(--color-slate-700)', 800: 'var(--color-slate-800)' }
       },
       fontFamily: { display: ['"Space Grotesk"', 'sans-serif'], sans: ['Inter', 'sans-serif'], mono: ['"IBM Plex Mono"', 'monospace'] },
-      borderRadius: { card: '14px' }
+      borderRadius: { card: '18px' }
     }
   },
   plugins: []

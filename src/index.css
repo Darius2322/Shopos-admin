@@ -97,3 +97,24 @@ html.light .hover\:bg-slate-700:hover { background-color: #cfd8d2; }
 [data-sy="1"]::-webkit-scrollbar { width: 4px; }
 [data-sx="1"]::-webkit-scrollbar-thumb, [data-sy="1"]::-webkit-scrollbar-thumb { background: rgb(100 116 139 / .55); border-radius: 999px; }
 @media (prefers-reduced-motion: no-preference) { [data-sx="1"] { scroll-behavior: smooth; } }
+
+/* ---- Airy spacing pass (Nov 26): roomier padding, bigger touch targets. Add data-dense to any screen that must stay compact (the POS sell screen does). ---- */
+body { line-height: 1.6; }
+.btn-primary, .btn-secondary, .btn-danger { min-height: 2.75rem; padding: .7rem 1.25rem; }
+.input { min-height: 2.75rem; padding: .7rem 1rem; }
+main .card.p-3:not([data-dense] *), main .card .p-3:not([data-dense] *) { padding: 1rem; }
+main .card.p-4:not([data-dense] *), main .card.p-5:not([data-dense] *) { padding: 1.35rem; }
+main .card.p-6:not([data-dense] *) { padding: 1.75rem; }
+main .space-y-1:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: .5rem; }
+main .space-y-2:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: .85rem; }
+main .space-y-3:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: 1.15rem; }
+main .space-y-4:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: 1.6rem; }
+main .space-y-5:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: 1.9rem; }
+main .space-y-6:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: 2.25rem; }
+main .gap-2:not([data-dense] *) { gap: .65rem; }
+main .gap-3:not([data-dense] *) { gap: .95rem; }
+main .gap-4:not([data-dense] *) { gap: 1.35rem; }
+main .divide-y:not([data-dense] *) > .py-2 { padding-block: .8rem; }
+main .divide-y:not([data-dense] *) > .py-2\.5, main .divide-y:not([data-dense] *) > .py-3 { padding-block: 1rem; }
+main .grid:not([data-dense] *).gap-2 { gap: .8rem; }
+@media (min-width: 768px) { main .space-y-4:not([data-dense] *) > :not([hidden]) ~ :not([hidden]) { margin-top: 1.85rem; } }
