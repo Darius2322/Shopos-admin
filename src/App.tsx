@@ -187,6 +187,13 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
     setTab('businesses');
   }
 
+  /** Tapping a notification (bell or inbox) opens the menu that needs you. */
+  function goNotification(t: Tab, bid?: string | null, kind?: string) {
+    if (bid && (kind === 'signup' || kind === 'deletion')) { openBusiness(bid); return; }
+    if (kind === 'reactivation') (window as unknown as { __adminPill?: string }).__adminPill = 'pause';
+    selectTab(t);
+  }
+
   function selectTab(key: Tab) {
     setTab(key);
     if (key !== 'businesses') setOpenBusinessId(null);
@@ -216,7 +223,7 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             <div className="flex items-center gap-0.5 shrink-0">
               <button aria-label="Refresh everything" title="Refresh everything" onClick={() => void refreshAll()} className="p-1.5 text-slate-400 hover:text-ink"><RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} /></button>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              <NotificationsMenu key={`bell${refreshKey}`} supabase={supabase} onGoToRequests={() => selectTab('requests')} />
+              <NotificationsMenu key={`bell${refreshKey}`} supabase={supabase} onGo={goNotification} />
             </div>
           </div>
         </header>
@@ -239,8 +246,8 @@ function Shell({ supabase, onSignOut }: { supabase: SupabaseClient; onSignOut: (
             {tab === 'branches' && <Branches supabase={supabase} onOpenBusiness={openBusiness} />}
             {tab === 'features' && <FeatureRequests supabase={supabase} />}
             {tab === 'promote' && <Promote />}
-            {(tab === 'inbox' || tab === 'inboxpast') && <Inbox supabase={supabase} view={tab === 'inbox' ? 'new' : 'past'} onGo={(t, bid, kind) => { if (bid && (kind === 'signup' || kind === 'deletion')) openBusiness(bid); else { if (kind === 'reactivation') (window as unknown as { __adminPill?: string }).__adminPill = 'pause'; selectTab(t); } }} />}
-            {(tab === 'inactive' || tab === 'lastseen') && <ActivityTabs inactive={<Inactive supabase={supabase} onOpenBusiness={openBusiness} />} lastSeen={<LastSeen supabase={supabase} />} autoPause={<AutoPause supabase={supabase} />} />}
+            {(tab === 'inbox' || tab === 'inboxpast') && <Inbox supabase={supabase} view={tab === 'inbox' ? 'new' : 'past'} onGo={goNotification} />}
+            {(tab === 'inactive' || tab === 'lastseen') && <ActivityTabs inactive={<Inactive supabase={supabase} onOpenBusiness={openBusiness} />} lastSeen={<LastSeen supabase={supabase} onOpenBusiness={openBusiness} />} autoPause={<AutoPause supabase={supabase} />} />}
             {tab === 'statusup' && <Status supabase={supabase} view="uptime" />}
             {tab === 'statuslog' && <Status supabase={supabase} view="log" />}
             {tab === 'statuspage' && <Status supabase={supabase} view="page" />}
