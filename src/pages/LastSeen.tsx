@@ -29,6 +29,14 @@ export default function LastSeen({ supabase, onOpenBusiness }: { supabase: Supab
   const [err, setErr] = useState<string | null>(null); const [q, setQ] = useState('');
   const [quiet, setQuiet] = useState(0); const [custom, setCustom] = useState(''); const [sort, setSort] = useState<'recent' | 'quiet'>('recent');
   const [open, setOpen] = useState<Shop | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set()); const [compose, setCompose] = useState(false); const [title, setTitle] = useState('We miss you at ShopOS'); const [text, setText] = useState('Hi! We noticed you have not used ShopOS for a while. Is everything okay? Open the app and sign in, we are happy to help if you are stuck.'); const [sending, setSending] = useState(false); const [done, setDone] = useState<string | null>(null);
+  const toggle = (id: string) => setSel((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  async function sendWinback() {
+    setSending(true); setErr(null);
+    const { data, error } = await supabase.rpc('admin_send_winback', { p_business_ids: [...sel], p_title: title, p_body: text });
+    setSending(false); if (error) { setErr(describeError(error, 'Could not send')); return; }
+    setDone(`Sent to ${(data as { sent: number }).sent} shop${(data as { sent: number }).sent === 1 ? '' : 's'}.`); setSel(new Set()); setCompose(false);
+  }
 
   const load = useCallback(async (k: Kind) => {
     setErr(null);
@@ -61,10 +69,18 @@ export default function LastSeen({ supabase, onOpenBusiness }: { supabase: Supab
         <div className="mt-2 text-xs text-slate-500">{loading ? 'Loading…' : `${count} ${kind === 'shop' ? 'shop' : 'person'}${count === 1 ? '' : 's'}${quiet ? ` quiet for ${span(quiet)} or more` : ''}`}</div>
       </Card>
       {err && <ErrorText>{err}</ErrorText>}
+      {done && <p className="text-sm text-emerald-400">{done}</p>}
+      {kind === 'shop' && !loading && shownShops.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <button className="underline text-slate-300" onClick={() => setSel(sel.size === shownShops.length ? new Set() : new Set(shownShops.filter((x) => x.status === 'active').map((x) => x.id)))}>{sel.size ? 'Clear selection' : 'Select all active shown'}</button>
+          {sel.size > 0 && <button className="btn-primary text-xs" onClick={() => { setDone(null); setCompose(true); }}>Message {sel.size} shop{sel.size === 1 ? '' : 's'}</button>}
+        </div>)}
       {loading ? <Skeleton /> : count === 0 ? <EmptyState message={quiet ? 'Nobody has been quiet that long.' : kind === 'booker' ? 'Nobody yet. Bookers appear after they open the booker app or a booking page.' : 'Nothing found.'} /> : kind === 'shop' ? (
         <Card><div className="divide-y divide-slate-700/60">
           {shownShops.map((s) => { const d = quietDays(s.last_seen, s.created_at); return (
-            <button key={s.id} onClick={() => setOpen(s)} className="w-full text-left py-3 flex items-start gap-3">
+            <div key={s.id} className="flex items-start gap-3">
+            {s.status === 'active' && <input type="checkbox" aria-label={`Select ${s.name}`} checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="mt-4 w-4 h-4 shrink-0" />}
+            <button onClick={() => setOpen(s)} className="flex-1 min-w-0 text-left py-3 flex items-start gap-3">
               <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${online(s.last_seen) ? 'bg-emerald-500' : d >= 30 ? 'bg-rust-500' : 'bg-slate-500'}`} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{s.name} <span className="text-[10px] rounded bg-slate-700 px-1.5 py-0.5 font-normal text-slate-300">{s.status}</span></div>
@@ -72,7 +88,7 @@ export default function LastSeen({ supabase, onOpenBusiness }: { supabase: Supab
                 <div className="text-xs text-slate-500 mt-0.5">{s.sales_30d} sales in 30 days · {s.sales_total} total · {s.products} products{s.app_version ? ` · v${s.app_version}` : ''}</div>
               </div>
               <div className="text-right text-xs shrink-0"><div className="font-medium">{online(s.last_seen) ? 'Online now' : s.last_seen ? ago(s.last_seen) : 'never used'}</div><div className="text-slate-500">quiet {span(d)}</div></div>
-            </button>); })}
+            </button></div>); })}
         </div></Card>
       ) : (
         <Card><div className="divide-y divide-slate-700/60">
@@ -88,6 +104,16 @@ export default function LastSeen({ supabase, onOpenBusiness }: { supabase: Supab
             </div>))}
         </div></Card>
       )}
+
+      {compose && (
+        <Modal title={`Message ${sel.size} shop${sel.size === 1 ? '' : 's'}`} subtitle="Sent as a push notification and an in-app message to the owners" onClose={() => setCompose(false)}>
+          <div className="space-y-3">
+            <label className="block text-xs text-slate-400">Title<input value={title} onChange={(e) => setTitle(e.target.value.slice(0, 80))} className="mt-1 w-full rounded border border-slate-600 bg-transparent px-2 py-2 text-sm" /></label>
+            <label className="block text-xs text-slate-400">Message<textarea rows={4} value={text} onChange={(e) => setText(e.target.value.slice(0, 240))} className="mt-1 w-full rounded border border-slate-600 bg-transparent px-2 py-2 text-sm" /></label>
+            <p className="text-[11px] text-slate-500">{text.length}/240. You can send up to 10 batches an hour.</p>
+            <div className="flex gap-2"><button className="btn-primary text-xs" disabled={sending || title.trim().length < 2 || text.trim().length < 5} onClick={() => void sendWinback()}>{sending ? 'Sending…' : 'Send now'}</button><button className="btn-secondary text-xs" onClick={() => setCompose(false)}>Cancel</button></div>
+          </div>
+        </Modal>)}
 
       {open && (
         <Modal title={open.name} subtitle={`${open.status} · signed up ${dt(open.created_at)}`} onClose={() => setOpen(null)}>
