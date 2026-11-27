@@ -37,7 +37,7 @@ export async function platformStatus(): Promise<PlatformPay | { error: string }>
 }
 export const platformSave = (i: { enabled: boolean; kind: string; number: string; displayName?: string; accountNumber?: string; env?: string; consumerKey?: string; consumerSecret?: string; passkey?: string; headOfficeNumber?: string }) => call({ action: 'platform_save', ...i });
 
-export interface AssistantAction { business_id: string; kind: string; decision: string; label: string }
+export interface AssistantAction { business_id: string; kind: string; decision: string; label: string; type?: string; status?: string }
 async function invokeAssistant(body: Record<string, unknown>): Promise<{ text?: string; action?: AssistantAction | null; error?: string }> {
   if (!supabase) return { error: 'Not connected.' };
   const { data, error } = await supabase.functions.invoke('admin-assistant', { body });
@@ -53,4 +53,4 @@ async function invokeAssistant(body: Record<string, unknown>): Promise<{ text?: 
   return { text: String(d?.text ?? ''), action: d?.action ?? null };
 }
 export const askAssistant = (question: string, history: { role: 'me' | 'ai'; text: string }[]) => invokeAssistant({ question, history });
-export const confirmAssistantAction = (a: AssistantAction) => invokeAssistant({ confirm: { business_id: a.business_id, kind: a.kind, decision: a.decision } });
+export const confirmAssistantAction = (a: AssistantAction) => invokeAssistant({ confirm: a.type === 'set_status' ? { type: 'set_status', business_id: a.business_id, status: a.status } : { business_id: a.business_id, kind: a.kind, decision: a.decision } });
